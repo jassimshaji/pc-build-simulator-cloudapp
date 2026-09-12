@@ -19,6 +19,7 @@
     "vitest": "^3.2.7"
   },
   "dependencies": {
+    "@pcbuilder/component-models": "workspace:*",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
     "three": "^0.186.0"

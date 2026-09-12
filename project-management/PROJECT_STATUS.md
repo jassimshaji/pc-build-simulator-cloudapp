@@ -1,8 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 4, Milestone 2 COMPLETE (procedural generators) —
-next up is Milestone 3 (installation zone system)
-**Overall completion:** ~66%
+**Current phase:** Phase 4, Milestone 3 COMPLETE (installation zone system) —
+next up is Milestone 4 (click-to-place wired to the compatibility engine)
+**Overall completion:** ~68%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -125,15 +125,43 @@ horizontal overflow).
   lighter, clearly-contrasting palette and bumped ambient light intensity.
   Verified live: all 6 models render as distinct, correctly-shaped, visually
   legible objects with zero console errors.
+- **Phase 4, Milestone 3 — installation zone system:** `InstallationZone`
+  type (`{ key, acceptsCategory, position, rotation, constraints? }`, matching
+  ARCHITECTURE.md §7.2 exactly) plus two pure, data-driven zone generators in
+  `packages/three-d-engine/src/zones/`: `generateCaseZones(spec)` (fixed
+  zones — MOBO_TRAY, PSU_BAY, EXPANSION_SLOT_1 with a `maxLengthMm` GPU
+  clearance constraint, CPU_COOLER_MOUNT with a `maxHeightMm` constraint —
+  plus one zone per `radiatorSupport`/`fanSupportMm` array entry and one per
+  `driveBays` count) and `generateMotherboardZones(spec)` (CPU_SOCKET plus one
+  zone per `ramSlots`/`pcieSlots`/`m2Slots`/`sataPorts` count). Neither
+  hand-authors a zone list per model — both derive entirely from spec data.
+  12 new Vitest tests (7 case, 5 motherboard) verify zone counts, keys,
+  `acceptsCategory`, and constraint values against varied inputs. Wired real
+  zone highlighting into `WorkspaceCanvas`: a new `highlightCategory` prop
+  (driven by `build-workspace.tsx`'s existing category-picker state) makes
+  zones whose `acceptsCategory` matches glow brighter, everything else stays
+  dim — the "would this be compatible if placed here" affordance from
+  ARCHITECTURE.md §7.1 (full click-to-place is Milestone 4). Replaced the
+  Milestone 2 showcase row with a case + its own zones and a motherboard + its
+  own zones, shown side by side (each zone set stays in its own component's
+  local space — composing them into one real placed layout is Milestone 4's
+  job). Caught and fixed a real scaling bug via live screenshots: the first
+  attempt's 20mm zone markers were invisible at normal viewing distance,
+  and after bumping marker size to 45mm, motherboard slot zones (originally
+  spaced only 8mm apart, a stand-in for real DIMM pitch) overlapped into an
+  indistinguishable blob — fixed by widening slot-to-slot spacing to be
+  visually distinct from the marker size, since these positions are
+  explicitly schematic, not to-scale. Verified live: CPU, RAM, and PSU
+  category selection each correctly highlight only their own matching
+  zone(s) across both the case and the motherboard.
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 3.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 4.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 4: installation zone system (Milestone 3), click-to-place wired to the
-  compatibility engine (Milestone 4), remaining procedural generators
-  (Milestone 5: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD), GLTF asset
-  loading (Milestone 6).
+- Phase 4: click-to-place wired to the compatibility engine (Milestone 4),
+  remaining procedural generators (Milestone 5: Fan, AIO, Air Cooler, SSD,
+  Monitor, Case LCD), GLTF asset loading (Milestone 6).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
 
@@ -146,7 +174,8 @@ horizontal overflow).
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 4, Milestone 3: installation zone system** —
-a static list of named mounting zones generated from a placed Case's spec,
-with zone highlighting on component selection. See `SESSION_CHECKPOINT.md`
-for exact resume details.
+Say "Continue" to begin **Phase 4, Milestone 4: click-to-place wired to the
+compatibility engine** — clicking a highlighted zone snaps the selected
+component into it and triggers a real `runCompatibilityCheck()` (zones only
+accept compatible placements). See `SESSION_CHECKPOINT.md` for exact resume
+details.

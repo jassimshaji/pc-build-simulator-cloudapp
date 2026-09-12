@@ -175,7 +175,7 @@ Milestones (each independently shippable):
    camera controls (orbit/zoom/pan/reset).
 2. `[x]` Procedural generators for Case, Motherboard, CPU, RAM, GPU, PSU (the
    components needed for a minimal end-to-end build).
-3. `[ ]` Installation zone system generated from a placed Case's spec; zone
+3. `[x]` Installation zone system generated from a placed Case's spec; zone
    highlighting on component selection.
 4. `[ ]` Click-to-place interaction wired to the compatibility engine (zones only
    highlight/accept when compatible; placing triggers a real compatibility

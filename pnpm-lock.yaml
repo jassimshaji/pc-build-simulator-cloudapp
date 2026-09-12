@@ -308,6 +308,9 @@ importers:
 
   packages/three-d-engine:
     dependencies:
+      '@pcbuilder/component-models':
+        specifier: workspace:*
+        version: link:../component-models
       '@react-three/drei':
         specifier: ^10.7.8
         version: 10.7.8(@react-three/fiber@9.7.0(@types/react@19.3.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.186.0))(@types/react@19.3.0)(@types/three@0.185.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.186.0)

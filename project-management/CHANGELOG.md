@@ -2,6 +2,36 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 4, Milestone 3: installation zone system
+- `InstallationZone` type (`{ key, acceptsCategory, position, rotation,
+  constraints? }`) matching ARCHITECTURE.md §7.2 exactly, plus two pure,
+  data-driven generators in `packages/three-d-engine/src/zones/`:
+  `generateCaseZones` (MOBO_TRAY, PSU_BAY, an expansion slot with a real
+  `maxGpuLengthMm` clearance constraint, a cooler mount with a real
+  `maxCpuCoolerHeightMm` constraint, plus one zone per
+  radiator/fan-support array entry and drive-bay count) and
+  `generateMotherboardZones` (CPU socket plus one zone per RAM/PCIe/M.2/SATA
+  slot count). Neither hand-authors a zone list per model.
+- 12 new Vitest tests verify zone counts, keys, categories, and constraint
+  values against varied spec inputs.
+- Wired real zone highlighting into `WorkspaceCanvas`: a new
+  `highlightCategory` prop (driven by the existing category-picker state in
+  `build-workspace.tsx` — no new state needed) brightens zones matching the
+  selected category and dims everything else.
+- Replaced the Milestone 2 showcase row with a case + its own zones and a
+  motherboard + its own zones shown side by side (cross-component zone
+  composition is Milestone 4's job).
+- Caught and fixed two real bugs via live screenshots that unit tests
+  couldn't catch: zone markers were initially too small to see (20mm →
+  45mm), and after that fix the motherboard's slot zones — originally spaced
+  at real-world pitch (~8mm) — overlapped into a blob once markers were
+  45mm; fixed by widening the schematic spacing well past the marker size.
+- Verified live: CPU, RAM, and PSU category selection each correctly
+  highlight only their own matching zone(s) on both the case and the
+  motherboard.
+- Whole-workspace `pnpm typecheck` (11/11), `pnpm build` (6/6), `pnpm test`
+  (138/138, up from 126), `pnpm --filter web run lint` (clean) all pass.
+
 ## 2026-09-12 — Phase 4, Milestone 2: procedural generators
 - Six pure, framework-agnostic generator functions in
   `packages/three-d-engine/src/procedural/`: `createGenericCase`,

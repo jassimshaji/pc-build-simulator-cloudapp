@@ -207,7 +207,7 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
         {/* 3D workspace */}
         <main className="flex min-h-[16rem] flex-1 flex-col gap-2 border-b border-zinc-800 p-3 lg:min-h-0 lg:border-b-0 lg:border-r">
           <div className="min-h-0 flex-1 overflow-hidden rounded border border-zinc-800">
-            <WorkspaceCanvas ref={canvasRef} />
+            <WorkspaceCanvas ref={canvasRef} highlightCategory={activeCategoryKey} />
           </div>
           <div className="flex items-center justify-between text-xs text-zinc-500">
             <span>Drag to orbit · Scroll to zoom · Right-click drag to pan</span>
