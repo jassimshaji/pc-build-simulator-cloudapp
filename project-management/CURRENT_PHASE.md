@@ -2,15 +2,16 @@
 
 **Phase 1 — Core Cloud Application Foundation: IN PROGRESS**
 
-Milestone 1 (monorepo scaffold) and Milestone 2 (database schema) are complete and
+Milestones 1 (monorepo scaffold), 2 (database schema), and 3 (auth) are complete and
 verified. See `DEVELOPMENT_ROADMAP.md` → Phase 1 for the full milestone list.
 
-## Next up: Phase 1, Milestone 3 — Auth
-Auth.js (NextAuth) Credentials provider + Prisma adapter in `apps/web`, register/login
-pages, JWT session with a `role` claim (`USER` / `ADMIN` / `INVENTORY_MANAGER` — the
-`Role` enum already exists on `User` in the Prisma schema), a shared `requireRole()`
-server helper, and middleware-protected routes. See `ARCHITECTURE.md` §9 (security)
-and `DEVELOPMENT_ROADMAP.md` → Phase 1 → Milestone 3.
+## Next up: Phase 1, Milestone 4 — Base app shell UI
+Top nav, the three-panel workspace layout (inventory / 3D area placeholder /
+details+compatibility), responsive breakpoints, dark "engineering tool" theme. Should
+incorporate the auth state that already exists (nav shows sign in/out, links to
+`/admin` for admin/inventory-manager roles) rather than replacing it. See
+`ARCHITECTURE.md` (UI layout in the original project brief, not yet its own numbered
+section) and `DEVELOPMENT_ROADMAP.md` → Phase 1 → Milestone 4.
 
 Waiting for explicit user instruction ("Continue" / "Resume development") before
-starting Milestone 3. See `SESSION_CHECKPOINT.md` for exact resume state.
+starting Milestone 4. See `SESSION_CHECKPOINT.md` for exact resume state.

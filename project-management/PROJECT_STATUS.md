@@ -1,37 +1,40 @@
 # Project Status
 
-**Current phase:** Phase 1 — Core Cloud Application Foundation (Milestones 1-2 of 5 complete)
-**Overall completion:** ~13%
+**Current phase:** Phase 1 — Core Cloud Application Foundation (Milestones 1-3 of 5 complete)
+**Overall completion:** ~18%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
   design, cloud deployment design, and the project-management continuity system.
 - Phase 1, Milestone 1 — **Monorepo scaffold** (pnpm + Turborepo + real Next.js 16 app
-  + 5 package stubs, all building/typechecking; `pnpm dev` verified serving on
-  localhost:3000).
-- Phase 1, Milestone 2 — **Database schema:**
-  - Installed PostgreSQL 17 locally as a native Windows service (no Docker on this
-    machine) — see ADR-006 in `DECISIONS.md` for exact setup/credentials notes.
-  - Full Prisma schema in `packages/database/prisma/schema.prisma`: `User`, `Brand`,
-    `ComponentCategory`, `Component` (hybrid relational/JSONB per ADR-002),
-    `Inventory`, `ThreeDAsset`, `CompatibilityRule`, `PCBuild`, `BuildComponent`.
-  - Initial migration (`init`) applied and verified against a real database.
-  - `prisma/seed.ts` (upsert-based, safe to re-run): seeds all 12 planned component
-    categories, 8 brands, 8 compatibility rule definitions, and 7 real-ish
-    components (2 CPUs, 1 motherboard, 1 GPU, 1 RAM kit, 1 PSU, 1 case), each with an
-    `Inventory` row and a `PROCEDURAL_FALLBACK` `ThreeDAsset` row.
-  - `packages/database/src/index.ts` exports a singleton `PrismaClient`.
-  - `docker/docker-compose.yml` added for anyone who does have Docker.
-  - **Verified:** migration applies cleanly, seed runs and is idempotent on re-run
-    (counts confirmed via direct SQL query), and the whole workspace still
-    typechecks/builds (`pnpm typecheck`, `pnpm build`, 6/6 packages passing).
+  + 5 package stubs).
+- Phase 1, Milestone 2 — **Database schema** (full Prisma schema, migration applied,
+  12 categories/8 brands/7 components seeded, verified idempotent).
+- Phase 1, Milestone 3 — **Auth:**
+  - next-auth v4 (Credentials provider, JWT session strategy) wired into `apps/web`,
+    querying the existing `User`/`Role` model directly (no Prisma adapter needed —
+    ADR-007).
+  - `POST /api/auth/register` (Zod-validated, bcryptjs-hashed) + `/api/auth/[...nextauth]`
+    catch-all handler.
+  - `/login` and `/register` pages (client components using `signIn`/fetch), home
+    page shows session state and admin link when applicable.
+  - Role travels in the JWT/session (`user.id`, `user.role`); module augmentation in
+    `apps/web/types/next-auth.d.ts`.
+  - `apps/web/proxy.ts` (Next.js 16's renamed `middleware.ts` convention) gates
+    `/admin/:path*` by role; `apps/web/lib/requireRole.ts` is the authoritative
+    server-side check for API routes/server components.
+  - **Verified against the live dev server:** register → 201; credentials sign-in →
+    session correctly carries id+role; `/admin` → 307 redirect for a `USER`-role
+    session, 200 after promoting to `ADMIN` in the DB and re-authenticating; full
+    workspace `pnpm typecheck`/`pnpm build`/`pnpm --filter web lint` all pass; test
+    user cleaned up afterward.
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Milestone 3 (auth).
+- Nothing — at a checkpoint awaiting user instruction to start Milestone 4 (base app
+  shell UI).
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 1: auth (Milestone 3), base app shell UI (Milestone 4), first components API
-  (Milestone 5).
+- Phase 1: base app shell UI (Milestone 4), first components API (Milestone 5).
 - Phase 2: full inventory admin system.
 - Phase 3: compatibility engine implementation + tests, power calculation.
 - Phase 4: 3D workspace (R3F canvas, procedural generators, install zones, click-to-place).
@@ -39,14 +42,14 @@
 - Phase 6: fan/airflow visualization.
 
 ## Known issues
-- None currently. (`apps/web` doesn't read from the database yet — expected, that's
-  Milestone 5, not a bug.)
+- None currently.
 
 ## Blockers
-- None. Node.js, pnpm, and PostgreSQL are all installed and verified working on this
-  machine.
+- None. Node.js, pnpm, PostgreSQL, and now working auth are all installed/verified on
+  this machine.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 1, Milestone 3: Auth** (Auth.js Credentials provider +
-Prisma adapter, register/login pages, JWT session with role claim, `requireRole()`
-helper). See `SESSION_CHECKPOINT.md` for exact resume details.
+Say "Continue" to begin **Phase 1, Milestone 4: Base app shell UI** (top nav, the
+three-panel workspace layout, responsive breakpoints, dark theme — building on the
+existing auth state rather than replacing it). See `SESSION_CHECKPOINT.md` for exact
+resume details.

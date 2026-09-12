@@ -19,7 +19,7 @@ holds a shorter, onboarding-friendly summary that points back here for depth.
 | Backend | Next.js Route Handlers (`app/api/**`) for MVP; business logic lives in framework-agnostic packages | Avoids a premature microservice split. If load ever demands it, the route handlers are thin adapters over `packages/*` logic, so extracting a standalone service later is a lift-and-shift, not a rewrite. |
 | Database | PostgreSQL | Relational integrity for Users/Builds/Inventory, strong JSONB support for flexible per-category specs, mature hosting options. |
 | ORM | Prisma | Strong TypeScript typing end-to-end, migrations, good JSONB + relational modeling support. |
-| Auth | Auth.js (NextAuth v5) — Credentials provider + JWT session, Prisma adapter | Built for Next.js App Router, supports role claims in the JWT/session for RBAC, easy to add OAuth providers later without a rewrite. |
+| Auth | Auth.js / next-auth v4 (v5 was still not what `next-auth@latest` resolved to at implementation time) — Credentials provider + JWT session, `authorize()` queries Prisma directly | Works in the App Router via a catch-all route handler + `next-auth/middleware`. Role travels in the JWT/session for RBAC. No `@auth/prisma-adapter` — see ADR-007: an adapter mainly matters for OAuth account linking/database sessions, neither of which this app uses yet; adding OAuth later means adding the adapter and its Account/Session tables then, not now. |
 | Object storage (3D assets, images) | Cloudflare R2 (S3-compatible API) | No egress fees (3D/GLB assets are large and re-fetched often), S3-compatible so any S3 SDK/tooling works, pairs with Cloudflare CDN for delivery. |
 | Hosting — web/API | Vercel | Zero-config Next.js deploys, preview deployments per PR, generous free tier for MVP. |
 | Hosting — database | Neon (serverless Postgres) | Branching per-PR/preview environment, scales to zero in dev, standard Postgres (no lock-in), cheap to start. |
@@ -407,7 +407,9 @@ Developer → GitHub → GitHub Actions (lint/typecheck/test) → Vercel (build 
 
 ## 9. Security Architecture
 
-- Passwords hashed with `bcrypt` (via Auth.js Credentials provider).
+- Passwords hashed with `bcryptjs` (via Auth.js Credentials provider; the pure-JS
+  `bcryptjs` was chosen over native `bcrypt` to avoid a native-module build step in
+  environments without build tools readily available).
 - RBAC enforced in API route handlers via a shared `requireRole()` helper reading the
   session JWT — never trust client-supplied role claims.
 - All mutating API routes validate input with the matching Zod schema before touching

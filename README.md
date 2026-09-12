@@ -66,14 +66,15 @@ pnpm lint          # lint all packages/apps
 pnpm test          # run tests in all packages/apps
 ```
 
-Only `apps/web` (a default Next.js starter page so far) is functional at this point;
-it does not yet talk to the database. `packages/database` has a real Prisma schema,
-migration, and seed data (see `docs/DATABASE.md`) but nothing in `apps/web` reads it
-yet. The other `packages/*` are still empty stubs pending Phases 2-4. There is no
-auth or API yet — see `project-management/PROJECT_STATUS.md` for live status.
+`apps/web` now has working registration/login (`/register`, `/login`), sessions
+(next-auth v4, JWT strategy carrying the user's role), and a role-gated `/admin`
+placeholder — but no other real pages/API yet (no component/inventory data flows
+through it). `packages/database` has a real Prisma schema, migration, and seed data
+(see `docs/DATABASE.md`). The other `packages/*` are still empty stubs pending Phases
+2-4. See `project-management/PROJECT_STATUS.md` for live status.
 
-To set up the database: `docs/DATABASE.md` has full instructions (requires a local
-PostgreSQL server via Docker or a native install).
+Setup requires a local PostgreSQL server (`docs/DATABASE.md`) and an `apps/web/.env.local`
+(`docs/DEVELOPMENT.md` has the exact steps, including generating an auth secret).
 
 ## Running Tests
 

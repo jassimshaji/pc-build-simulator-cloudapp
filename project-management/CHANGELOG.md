@@ -2,6 +2,28 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 1, Milestone 3: Auth
+- Wired next-auth v4 (Credentials provider, JWT sessions) into `apps/web`, querying
+  the existing `User`/`Role` model directly via `@pcbuilder/database` — no Prisma
+  adapter, since Credentials + JWT doesn't need one (ADR-007; the architecture doc
+  originally said "NextAuth v5 + Prisma adapter" as a Phase 0 placeholder, corrected
+  to match reality).
+- Added `POST /api/auth/register` (Zod validation, bcryptjs hashing) and the standard
+  `/api/auth/[...nextauth]` catch-all handler.
+- Added `/login` and `/register` pages, a session-aware home page, and a role-gated
+  `/admin` placeholder. Role travels in the JWT/session via a module augmentation.
+- Route protection lives in `apps/web/proxy.ts`, not `middleware.ts` — Next.js 16
+  renamed that file convention; using the old name would still work today but is
+  already deprecated, so the new name was used from the start.
+- Verified the entire flow against the live dev server (not just typecheck): register
+  → login → session → `/admin` blocked for `USER`, allowed after promoting to `ADMIN`
+  in the database and re-authenticating. Test user cleaned up afterward.
+- Corrected the root `.env.example` (`AUTH_SECRET`/`AUTH_URL` → the actual v4 names
+  `NEXTAUTH_SECRET`/`NEXTAUTH_URL`) and updated `docs/API.md`/`docs/DEVELOPMENT.md`/
+  `README.md` with real setup and testing steps.
+- Stopped at the Phase 1 / Milestone 3 checkpoint; base app shell UI (Milestone 4) is
+  next, pending user "Continue".
+
 ## 2026-09-12 — Phase 1, Milestone 2: Database schema
 - Installed PostgreSQL 17 locally as a native Windows service (no Docker on this
   machine); created a dedicated `pcbuilder` role/database (see ADR-006 in

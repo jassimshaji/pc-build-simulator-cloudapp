@@ -40,9 +40,14 @@ Milestones (each independently shippable):
    (12 categories, 8 brands, 8 compatibility rule definitions, 7 components) and
    confirmed idempotent on re-run. `docker/docker-compose.yml` also added for
    anyone who does have Docker.
-3. `[ ]` Auth: Auth.js Credentials provider + Prisma adapter, register/login pages,
-   JWT session with `role` claim, `requireRole()` server helper, middleware-protected
-   routes.
+3. `[x]` Auth: Auth.js Credentials provider, register/login pages, JWT session with a
+   `role` claim, `requireRole()` server helper, middleware-protected routes. **Done
+   2026-09-12** — next-auth v4 (not v5, see ADR-007), no Prisma adapter (not needed
+   for Credentials + JWT). Verified end-to-end against the live dev server: register
+   → 201, credentials sign-in → session carries id+role, `/admin` returns a 307
+   redirect for a `USER`-role session and 200 after promoting to `ADMIN` in the DB
+   and re-authenticating. `middleware.ts` written as `proxy.ts` per Next.js 16's
+   renamed convention (confirmed the deprecation warning disappears).
 4. `[ ]` Base app shell UI: top nav, the three-panel workspace layout (inventory /
    3D area placeholder / details+compatibility), responsive breakpoints, dark
    "engineering tool" theme.

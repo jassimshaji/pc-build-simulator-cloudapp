@@ -1,8 +1,32 @@
 # API Reference
 
-Status: design-stage — no routes implemented yet (Phase 1+). This document will be
-filled in with real request/response shapes as each route is built; for now it records
-the intended surface from `project-management/ARCHITECTURE.md`.
+Status: auth routes implemented (Phase 1, Milestone 3); everything else is still
+design-stage. This document will be filled in with real request/response shapes as
+each remaining route is built; for now it records the intended surface from
+`project-management/ARCHITECTURE.md`.
+
+## Implemented
+
+### `POST /api/auth/register`
+Public. Body: `{ email: string, password: string (min 8 chars), name?: string }`.
+Validates with Zod, hashes the password with `bcryptjs`, creates a `User` with role
+`USER`. Returns `409` if the email is already registered, `400` on invalid input,
+`201` with `{ data: { id, email }, error: null }` on success. Does not sign the user
+in — the client calls `signIn("credentials", ...)` afterward (see `app/register/page.tsx`).
+
+### `/api/auth/[...nextauth]` (GET/POST)
+next-auth v4's catch-all handler: `/api/auth/session`, `/api/auth/csrf`,
+`/api/auth/callback/credentials`, `/api/auth/signout`, etc. Session strategy is JWT;
+the session/JWT carry `user.id` and `user.role` (see `apps/web/lib/auth.ts` and the
+module augmentation in `apps/web/types/next-auth.d.ts`).
+
+### Route protection
+- `apps/web/proxy.ts` (Next.js 16's renamed `middleware.ts` convention) gates
+  `/admin/:path*`, redirecting to `/` unless the session's JWT role is `ADMIN` or
+  `INVENTORY_MANAGER`.
+- `apps/web/lib/requireRole.ts` is the authoritative server-side check — use it at
+  the top of any server component or API route handler that needs role enforcement;
+  never trust a client-supplied role.
 
 ## Conventions (once implemented)
 - All responses use a consistent envelope: `{ data, error }` (never both populated).

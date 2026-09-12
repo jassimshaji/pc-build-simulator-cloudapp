@@ -28,8 +28,27 @@ pnpm --filter @pcbuilder/database run db:seed      # seed categories/brands/comp
 pnpm --filter @pcbuilder/database run db:studio    # optional: browse data in Prisma Studio
 ```
 
-`apps/web` does not yet read from the database (no API routes exist yet — that's
-Phase 1, Milestone 5).
+## Auth (Phase 1, Milestone 3 — done)
+
+`apps/web` needs its own env file (Next.js reads env vars from the app's own
+directory, not the monorepo root):
+
+```
+cp apps/web/.env.example apps/web/.env.local
+# then fill in DATABASE_URL (same as packages/database/.env) and generate NEXTAUTH_SECRET:
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Then `pnpm dev` and visit `/register` to create an account, `/login` to sign in, `/`
+shows session state, `/admin` is gated to `ADMIN`/`INVENTORY_MANAGER` roles (redirects
+everyone else). To promote a user to admin for local testing (no admin UI yet):
+
+```sql
+UPDATE "User" SET role = 'ADMIN' WHERE email = 'you@example.com';
+```
+
+`apps/web` still does not read component/inventory data from the database (no
+non-auth API routes exist yet — that's Phase 1, Milestone 5).
 
 ## Testing strategy
 

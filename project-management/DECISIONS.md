@@ -123,3 +123,36 @@ is running.
   `CREATEDB` privilege is required because `prisma migrate dev` creates a temporary
   shadow database to diff against.
 - This is a local dev convenience only — production still targets Neon per ADR-005.
+
+---
+
+## ADR-007: next-auth v4 (not v5), and no Prisma adapter for Credentials + JWT auth
+
+**Context:** The original plan (ARCHITECTURE.md, written in Phase 0) said "Auth.js
+(NextAuth v5) — Credentials provider + JWT session, Prisma adapter." When it came time
+to actually install it, `pnpm add next-auth` resolved to `next-auth@4.24.15` — v5
+either isn't tagged `latest` yet or doesn't exist as a stable release at
+implementation time. Separately: a database adapter (`@auth/prisma-adapter`) exists to
+persist OAuth accounts and/or database-backed sessions (it manages `Account`,
+`Session`, `VerificationToken` tables). This app only uses the Credentials provider
+with JWT sessions — no OAuth, no database sessions — so the adapter has nothing to do;
+adding it now would mean adding three unused tables to the schema for no behavior.
+
+**Decision:** Use `next-auth@4` as installed. Its Credentials provider's `authorize()`
+callback queries the existing `User` model directly via the `@pcbuilder/database`
+Prisma client (no adapter). Role-based access uses `next-auth/middleware`'s
+`withAuth()` (file named `proxy.ts`, not `middleware.ts` — Next.js 16 renamed the
+convention, see below) for route-level gating plus a shared `requireRole()` helper
+(`apps/web/lib/requireRole.ts`) for server-side/API-route enforcement that always
+re-reads the session server-side rather than trusting any client-supplied role.
+
+**Also noted:** Next.js 16 deprecated the `middleware.ts` file convention in favor of
+`proxy.ts` (same `withAuth()`-wrapped function, just renamed — "the functionality
+remains the same" per Next's own docs). The file was named `proxy.ts` from the start
+here to avoid the deprecation warning.
+
+**Consequences:** If/when OAuth providers (Google, GitHub, etc.) are added later,
+that's the point to add `@auth/prisma-adapter` and its tables — a schema migration at
+that time, not now. If next-auth v5 becomes the clearly-current stable release before
+that point, upgrading is a reasonably contained change (the Credentials + JWT pattern
+maps fairly directly onto v5's API) but is not being chased proactively.
