@@ -17,7 +17,7 @@ of duplicates — update status in place rather than re-adding a task.
 
 ## Phase 1 — Core Cloud Application Foundation
 - [COMPLETED] Monorepo scaffold (pnpm + Turborepo, apps/web Next.js/TS/Tailwind, packages/* stubs)
-- [TODO] Prisma schema + initial migration + seed script
+- [COMPLETED] Prisma schema + initial migration + seed script
 - [TODO] Auth (Auth.js Credentials + Prisma adapter, RBAC roles, requireRole helper)
 - [TODO] Base app shell UI (nav, three-panel workspace layout, theme)
 - [TODO] `/api/components` list/search/filter/get-by-id backed by real data

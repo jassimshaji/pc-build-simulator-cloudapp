@@ -32,9 +32,14 @@ Milestones (each independently shippable):
    shared `tsconfig.base.json`, ESLint/Prettier config. **Done 2026-09-12** — verified
    `pnpm install`, `pnpm typecheck`, `pnpm build` all pass across all 6 workspace
    packages, and `pnpm dev` serves the Next.js app on localhost:3000 (HTTP 200).
-2. `[ ]` `packages/database`: Prisma schema for User/Brand/ComponentCategory/Component/
+2. `[x]` `packages/database`: Prisma schema for User/Brand/ComponentCategory/Component/
    Inventory/ThreeDAsset/CompatibilityRule/PCBuild/BuildComponent, initial migration,
-   seed script with a handful of real-ish components per category.
+   seed script with a handful of real-ish components per category. **Done
+   2026-09-12** — installed PostgreSQL 17 locally (no Docker on this machine),
+   migration applied and verified against a real database, seed script run
+   (12 categories, 8 brands, 8 compatibility rule definitions, 7 components) and
+   confirmed idempotent on re-run. `docker/docker-compose.yml` also added for
+   anyone who does have Docker.
 3. `[ ]` Auth: Auth.js Credentials provider + Prisma adapter, register/login pages,
    JWT session with `role` claim, `requireRole()` server helper, middleware-protected
    routes.

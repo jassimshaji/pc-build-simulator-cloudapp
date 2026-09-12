@@ -2,6 +2,28 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 1, Milestone 2: Database schema
+- Installed PostgreSQL 17 locally as a native Windows service (no Docker on this
+  machine); created a dedicated `pcbuilder` role/database (see ADR-006 in
+  `DECISIONS.md` for exact credentials and the CREATEDB requirement for Prisma's
+  shadow database).
+- Wrote the full Prisma schema (`packages/database/prisma/schema.prisma`): User,
+  Brand, ComponentCategory, Component (hybrid relational/JSONB per ADR-002),
+  Inventory, ThreeDAsset, CompatibilityRule, PCBuild, BuildComponent.
+- Applied the initial migration against a real database and verified it end to end.
+- Wrote an upsert-based seed script (12 categories, 8 brands, 8 compatibility rule
+  definitions, 7 real-ish components across CPU/Motherboard/GPU/RAM/PSU/Case) and
+  confirmed it's idempotent on re-run.
+- Adopted Prisma 6's `prisma.config.ts` over the deprecated `package.json#prisma`
+  field (requires explicit `dotenv` loading, which is not obvious — documented in
+  `SESSION_CHECKPOINT.md`).
+- Added `docker/docker-compose.yml` for anyone with Docker; updated
+  `docs/DATABASE.md`, `docs/DEVELOPMENT.md`, and `README.md` with real setup steps.
+- Verified the whole workspace still typechecks/builds after adding the new
+  dependencies (had to add `@types/node` to `packages/database`).
+- Stopped at the Phase 1 / Milestone 2 checkpoint; auth (Milestone 3) is next,
+  pending user "Continue".
+
 ## 2026-09-12 — Phase 1, Milestone 1: Monorepo scaffold
 - Installed Node.js 24 LTS (via winget) and pnpm 12.4.1 (via `npm install -g pnpm`) —
   the dev machine had neither beforehand.

@@ -1,0 +1,186 @@
+// Prisma schema for the PC Builder Platform.
+// See project-management/ARCHITECTURE.md §4 for the full design rationale
+// (hybrid relational + JSONB component model, ADR-002 in DECISIONS.md).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  INVENTORY_MANAGER
+}
+
+enum ThreeDAssetKind {
+  GLTF_MODEL
+  PROCEDURAL_FALLBACK
+  PLACEHOLDER
+}
+
+enum Severity {
+  INFO
+  WARNING
+  ERROR
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  role         Role      @default(USER)
+  builds       PCBuild[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Brand {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  logoUrl    String?
+  components Component[]
+}
+
+// A data table, not an enum: new categories (HDD, capture cards, RGB
+// controllers, peripherals, ...) are added as new rows, never a migration.
+model ComponentCategory {
+  id         String      @id @default(cuid())
+  key        String      @unique // e.g. "CPU", "GPU", "MOTHERBOARD"
+  label      String
+  sortOrder  Int         @default(0)
+  components Component[]
+}
+
+model Component {
+  id         String            @id @default(cuid())
+  category   ComponentCategory @relation(fields: [categoryId], references: [id])
+  categoryId String
+  brand      Brand             @relation(fields: [brandId], references: [id])
+  brandId    String
+
+  model       String
+  sku         String  @unique
+  price       Decimal @db.Decimal(10, 2)
+  description String?
+  images      String[]
+
+  // Full category-specific spec object (validated at the app layer via Zod
+  // in packages/component-models before it's ever written). See ADR-002.
+  specifications Json
+
+  // Compatibility/filter-critical fields promoted from `specifications` into
+  // real, indexed columns (nullable, category-dependent). See ARCHITECTURE.md §4.1.
+  socket         String?
+  formFactor     String?
+  ramType        String?
+  pcieGeneration String?
+  lengthMm       Float?
+  widthMm        Float?
+  heightMm       Float?
+  tdpWatts       Int?
+  powerDrawWatts Int?
+  wattage        Int?
+
+  isAvailable Boolean @default(true)
+
+  inventory       Inventory?
+  threeDAssets    ThreeDAsset[]
+  buildComponents BuildComponent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([socket])
+  @@index([formFactor])
+  @@index([ramType])
+}
+
+model Inventory {
+  id                String    @id @default(cuid())
+  component         Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  componentId       String    @unique
+  stockQuantity     Int       @default(0)
+  lowStockThreshold Int       @default(5)
+  lastRestockedAt   DateTime?
+}
+
+model ThreeDAsset {
+  id          String           @id @default(cuid())
+  component   Component?       @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  componentId String?
+  kind        ThreeDAssetKind
+
+  url                    String? // R2 path; null when kind = PROCEDURAL_FALLBACK
+  proceduralGeneratorKey String? // e.g. "createGenericGPU"; set only for PROCEDURAL_FALLBACK
+
+  source      String?
+  licenseInfo String?
+  attribution String?
+  usageRights Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([componentId])
+}
+
+// Admin-visible registry of which compatibility rules exist and whether
+// they're active. The actual comparison logic lives in
+// packages/compatibility-engine, NOT here (avoids a rules-engine-in-a-database
+// anti-pattern) — see ARCHITECTURE.md §6.
+model CompatibilityRule {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String
+  severity    Severity @default(ERROR)
+  isActive    Boolean  @default(true)
+}
+
+model PCBuild {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  name   String
+
+  workspaceState      Json? // camera position/zoom, UI panel state
+  compatibilityStatus Json? // last computed CompatibilityReport snapshot
+  estimatedPowerWatts Int?
+
+  isShared  Boolean @default(false)
+  shareSlug String? @unique
+
+  components BuildComponent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model BuildComponent {
+  id          String    @id @default(cuid())
+  build       PCBuild   @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  buildId     String
+  component   Component @relation(fields: [componentId], references: [id])
+  componentId String
+
+  installedZoneKey String // e.g. "PCIE_SLOT_1", "RAM_SLOT_2", "FRONT_FAN_1"
+
+  positionX Float @default(0)
+  positionY Float @default(0)
+  positionZ Float @default(0)
+  rotationX Float @default(0)
+  rotationY Float @default(0)
+  rotationZ Float @default(0)
+
+  @@index([buildId])
+  @@index([componentId])
+}

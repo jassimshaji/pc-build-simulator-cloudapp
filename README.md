@@ -66,9 +66,14 @@ pnpm lint          # lint all packages/apps
 pnpm test          # run tests in all packages/apps
 ```
 
-Only `apps/web` (a default Next.js starter page so far) is functional at this point.
-The `packages/*` are empty stubs pending Phases 2-4. There is no database, auth, or
-API yet — see `project-management/PROJECT_STATUS.md` for live status.
+Only `apps/web` (a default Next.js starter page so far) is functional at this point;
+it does not yet talk to the database. `packages/database` has a real Prisma schema,
+migration, and seed data (see `docs/DATABASE.md`) but nothing in `apps/web` reads it
+yet. The other `packages/*` are still empty stubs pending Phases 2-4. There is no
+auth or API yet — see `project-management/PROJECT_STATUS.md` for live status.
+
+To set up the database: `docs/DATABASE.md` has full instructions (requires a local
+PostgreSQL server via Docker or a native install).
 
 ## Running Tests
 

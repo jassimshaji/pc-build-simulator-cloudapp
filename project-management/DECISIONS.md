@@ -98,3 +98,28 @@ GLB/GLTF assets are large and repeatedly fetched).
 **Consequences:** All three have workable free/cheap starter tiers. Standard Postgres
 (Neon) and S3-compatible API (R2) mean migrating off either provider later is a
 config/connection-string change, not a rewrite.
+
+---
+
+## ADR-006: Local dev database — native PostgreSQL install, not Docker (this machine)
+
+**Context:** The dev machine had no Docker and no Postgres. Installing Docker Desktop
+on Windows typically needs WSL2/Hyper-V setup and often a reboot — disruptive for an
+unattended session. `winget install PostgreSQL.PostgreSQL.17` installs the server as a
+native Windows service with no reboot required.
+
+**Decision:** PostgreSQL 17 is installed natively as a Windows service on this
+machine for local development. `docker/docker-compose.yml` is still maintained and
+documented for anyone (or any CI environment) that does have Docker — the two are not
+mutually exclusive, `DATABASE_URL` is the only thing that needs to point at whichever
+is running.
+
+**Environment notes for future sessions on this machine:**
+- The `postgres` superuser password after the silent winget install turned out to be
+  literally `postgres` (not blank, not random) — this is worth checking first before
+  assuming a fresh reset is needed.
+- A dedicated `pcbuilder` role/database was created (`CREATE ROLE pcbuilder LOGIN
+  PASSWORD 'pcbuilder' CREATEDB; CREATE DATABASE pcbuilder OWNER pcbuilder;`). The
+  `CREATEDB` privilege is required because `prisma migrate dev` creates a temporary
+  shadow database to diff against.
+- This is a local dev convenience only — production still targets Neon per ADR-005.

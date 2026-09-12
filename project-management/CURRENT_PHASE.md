@@ -2,15 +2,15 @@
 
 **Phase 1 — Core Cloud Application Foundation: IN PROGRESS**
 
-Milestone 1 (monorepo scaffold) is complete and verified. See
-`DEVELOPMENT_ROADMAP.md` → Phase 1 for the full milestone list.
+Milestone 1 (monorepo scaffold) and Milestone 2 (database schema) are complete and
+verified. See `DEVELOPMENT_ROADMAP.md` → Phase 1 for the full milestone list.
 
-## Next up: Phase 1, Milestone 2 — Database schema
-`packages/database`: Prisma schema for User/Brand/ComponentCategory/Component/
-Inventory/ThreeDAsset/CompatibilityRule/PCBuild/BuildComponent (see
-`ARCHITECTURE.md` §4 for the designed schema), initial migration, seed script with a
-handful of real-ish components per category. Requires a local Postgres — the plan is
-`docker/docker-compose.yml` for local dev (not yet created).
+## Next up: Phase 1, Milestone 3 — Auth
+Auth.js (NextAuth) Credentials provider + Prisma adapter in `apps/web`, register/login
+pages, JWT session with a `role` claim (`USER` / `ADMIN` / `INVENTORY_MANAGER` — the
+`Role` enum already exists on `User` in the Prisma schema), a shared `requireRole()`
+server helper, and middleware-protected routes. See `ARCHITECTURE.md` §9 (security)
+and `DEVELOPMENT_ROADMAP.md` → Phase 1 → Milestone 3.
 
 Waiting for explicit user instruction ("Continue" / "Resume development") before
-starting Milestone 2. See `SESSION_CHECKPOINT.md` for exact resume state.
+starting Milestone 3. See `SESSION_CHECKPOINT.md` for exact resume state.

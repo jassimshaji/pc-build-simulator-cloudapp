@@ -16,14 +16,20 @@ Only `apps/web` does anything right now (the Next.js starter page). The `package
 workspaces are empty stubs (`export {}`) that typecheck/build successfully but have no
 real code yet — that lands in Phases 2-4.
 
-## Once the database exists (Phase 1, Milestone 2 — not yet built)
+## Database (Phase 1, Milestone 2 — done)
+
+Requires a local Postgres (either `docker compose -f docker/docker-compose.yml up -d`,
+or a natively installed server). See `docs/DATABASE.md` for full schema/setup detail.
 
 ```
-cp .env.example .env.local   # fill in DATABASE_URL etc.
-docker compose -f docker/docker-compose.yml up -d   # local Postgres
-pnpm --filter @pcbuilder/database exec prisma migrate dev
-pnpm --filter @pcbuilder/database exec prisma db seed
+cp packages/database/.env.example packages/database/.env   # adjust DATABASE_URL if needed
+pnpm --filter @pcbuilder/database run db:migrate   # apply migrations (creates a shadow DB — role needs CREATEDB)
+pnpm --filter @pcbuilder/database run db:seed      # seed categories/brands/components
+pnpm --filter @pcbuilder/database run db:studio    # optional: browse data in Prisma Studio
 ```
+
+`apps/web` does not yet read from the database (no API routes exist yet — that's
+Phase 1, Milestone 5).
 
 ## Testing strategy
 
