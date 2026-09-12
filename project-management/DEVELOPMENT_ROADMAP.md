@@ -57,7 +57,16 @@ Milestones (each independently shippable):
    via a Playwright screenshot check at desktop (1280px) and mobile (400px) widths:
    no horizontal overflow, panels correctly stack vertically on narrow screens, no
    console errors, `pnpm build`/`typecheck`/`lint` all pass.
-5. `[ ]` `/api/components` (list/search/filter/get-by-id) backed by real DB data.
+5. `[x]` `/api/components` (list/search/filter/get-by-id) backed by real DB data.
+   **Done 2026-09-12** — `GET /api/components` (category/brand/q/minPrice/maxPrice/
+   page/limit query params, Zod-validated), `GET /api/components/categories`,
+   `GET /api/components/:id`. Added `packages/shared`'s `apiSuccess`/`apiError`
+   envelope (used by these routes and retrofitted onto `/api/auth/register`).
+   `apps/web/app/workspace/page.tsx`'s category list now queries Prisma directly for
+   real seeded data instead of a hardcoded array (which was deleted). Verified
+   against the live dev server: list/filter/search/pagination/404/400-validation all
+   checked with real requests, and the workspace page's rendered HTML confirmed to
+   contain all 12 real category labels. **Phase 1 is now complete.**
 
 **Checkpoint** after each milestone; stop for explicit "Continue" at the end of the phase (or earlier if a milestone alone fills a session).
 

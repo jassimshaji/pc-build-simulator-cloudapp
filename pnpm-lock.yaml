@@ -181,6 +181,9 @@ importers:
       '@pcbuilder/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@pcbuilder/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3

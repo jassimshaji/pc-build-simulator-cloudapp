@@ -2,6 +2,20 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 1, Milestone 5: Components API (Phase 1 complete)
+- Added `packages/shared`'s `apiSuccess`/`apiError` response envelope (this package
+  was an empty stub until now); retrofitted the register route onto it too.
+- Added `GET /api/components` (category/brand/q/minPrice/maxPrice/page/limit,
+  Zod-validated, returns paginated results with category/brand/inventory included),
+  `GET /api/components/categories`, and `GET /api/components/:id` (404 if missing).
+  Deliberately no separate `/api/components/search` route — the `q` param covers it.
+- `/workspace`'s category list now queries Prisma directly for real seeded data;
+  deleted the hardcoded placeholder array from Milestone 4.
+- Verified every route against the live dev server with real requests: list, every
+  filter, pagination math, detail lookup, 404, and a 400 validation-error case.
+- **Phase 1 (Core Cloud Application Foundation) is now complete** — all 5 milestones
+  done. Phase 2 (Component Inventory System) is next, pending user "Continue".
+
 ## 2026-09-12 — Phase 1, Milestone 4: Base app shell UI
 - Committed to a single dark "engineering tool" theme in `app/globals.css` (dropped
   the create-next-app default of following OS light/dark preference — this is a

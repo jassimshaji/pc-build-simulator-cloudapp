@@ -1,11 +1,17 @@
-import { CATEGORIES } from "@/lib/categories";
+import { prisma } from "@pcbuilder/database";
 
-// Layout-only shell for this milestone (Phase 1, Milestone 4): the three-panel
-// workspace layout from the project brief, with placeholder content in every
-// panel. Real component browsing (Phase 2), compatibility checks (Phase 3),
-// and the actual 3D scene (Phase 4) replace these placeholders in later
-// milestones — the panel structure itself is what's meant to stay stable.
-export default function WorkspacePage() {
+// Layout-only shell (Phase 1, Milestone 4): the three-panel workspace layout
+// from the project brief. The category list is real seeded data (Milestone 5's
+// /api/components/categories exists too, for client-side/external consumers —
+// this server component queries Prisma directly rather than fetching its own
+// API route). Actual component browsing/selection (Phase 2), compatibility
+// checks (Phase 3), and the 3D scene (Phase 4) replace the remaining
+// placeholders in later milestones.
+export default async function WorkspacePage() {
+  const categories = await prisma.componentCategory.findMany({
+    orderBy: { sortOrder: "asc" },
+  });
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
@@ -20,9 +26,9 @@ export default function WorkspacePage() {
             />
           </div>
           <nav className="flex gap-2 overflow-x-auto px-3 pb-3 text-sm lg:flex-col lg:gap-1 lg:overflow-x-visible">
-            {CATEGORIES.map((category) => (
+            {categories.map((category) => (
               <button
-                key={category.key}
+                key={category.id}
                 type="button"
                 disabled
                 className="shrink-0 rounded px-3 py-1.5 text-left text-zinc-400 lg:w-full lg:shrink"

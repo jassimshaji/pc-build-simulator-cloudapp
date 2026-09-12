@@ -1,137 +1,138 @@
 SESSION DATE: 2026-09-12
 
-CURRENT PHASE: Phase 1 — Core Cloud Application Foundation (Milestones 1-4 of 5 complete)
+CURRENT PHASE: Phase 1 COMPLETE (all 5 milestones). Next: Phase 2 — Component Inventory System.
 
-CURRENT TASK: None in progress — awaiting user instruction for Milestone 5 (components API).
+CURRENT TASK: None in progress — awaiting user instruction for Phase 2, Milestone 1
+(`packages/component-models`).
 
-LAST COMPLETED STEP: Phase 1, Milestone 4 (base app shell UI), fully verified
-including a real visual check (not just typecheck/build).
-- `apps/web/app/globals.css`: replaced the create-next-app default (light theme,
-  dark only via `prefers-color-scheme`) with a single committed dark theme
-  (`--background: #09090b`, `--foreground: #e4e4e7`) — this is a workspace/tool UI,
-  not a marketing site that should follow OS preference. Also fixed body's
-  `font-family` to actually reference the `--font-sans` CSS variable that was
-  already defined but unused.
-- `apps/web/components/nav.tsx` (new): async server component, reads
-  `getServerSession(authOptions)` directly (no client hook needed), renders a fixed
-  `h-14` header with the "PC Builder" brand, a "Workspace" link, a conditional
-  "Admin" link (role `ADMIN`/`INVENTORY_MANAGER`), and on the right either
-  email+role+`<SignOutButton />` (imported from `@/app/sign-out-button`) or
-  Log in/Register links.
-- `apps/web/app/layout.tsx`: now renders `<Nav />` and `{children}` both inside
-  `<Providers>` (`<Providers><Nav />{children}</Providers>`) — this is valid because
-  `Nav` (a server component) is instantiated in `layout.tsx` (also a server
-  component) and merely *passed as children* to the client component `Providers`;
-  `SessionProvider` itself renders no extra DOM wrapper, so `flex flex-col` on
-  `<body>` still lays out `Nav` (shrink) then the page content (flex-1) exactly as
-  before Nav existed.
-- `apps/web/lib/categories.ts` (new): a hardcoded list of the 12 category
-  key/label pairs, explicitly commented as a stand-in for the real
-  `/api/components/categories` fetch that Milestone 5 adds — kept in sync by hand
-  with `packages/database/prisma/seed.ts`'s `CATEGORIES` for now.
-- `apps/web/app/workspace/page.tsx` (new): the three-panel layout from the project
-  brief. Left `<aside>` (fixed `lg:w-64`, becomes a horizontally-scrollable chip
-  strip below the `lg` breakpoint) — disabled search input + one disabled button per
-  category from `lib/categories.ts`. Center `<main>` — a dashed-border box saying
-  "3D workspace — lands in Phase 4" plus four disabled camera-control buttons
-  (Orbit/Zoom/Pan/Reset). Right `<aside>` (`lg:w-80`) — "Component details" and
-  "Compatibility" placeholder text blocks. `<footer>` — a thin build-summary bar
-  (component count / estimated power / compatibility, all placeholder `—` values).
-  Below `lg`, the three sections stack vertically instead of sitting in a row
-  (`flex-col lg:flex-row` on the wrapping div) and the whole page scrolls instead of
-  clipping (`overflow-y-auto` below `lg`, `overflow-hidden` at `lg`+ where the fixed
-  viewport-height layout takes over).
-- Simplified `apps/web/app/page.tsx` (home): removed the duplicated session
-  display/sign-out button (the nav now owns that everywhere) in favor of a single
-  "Preview workspace" / "Enter workspace" CTA linking to `/workspace`.
-- Restyled `apps/web/app/login/page.tsx`, `apps/web/app/register/page.tsx`,
-  `apps/web/app/admin/page.tsx`: dropped the now-inconsistent Tailwind `dark:`
-  variants (they only fire on OS dark preference, but the app no longer has a light
-  mode at all) in favor of direct dark-theme-appropriate classes
-  (`bg-zinc-900`/`border-zinc-700`/`text-zinc-100` etc. instead of
-  `dark:bg-zinc-900` etc.). Also fixed a stale comment in `admin/page.tsx` that still
-  said "middleware.ts" (renamed to `proxy.ts` back in Milestone 3).
-- **Visual verification (this is the part that matters most for a UI milestone):**
-  no browser-automation tool was directly available, so installed `playwright` in a
-  scratch directory (`<scratchpad>/ui-check`, NOT part of the repo), ran
-  `npx playwright install chromium` (this pulled `chrome-headless-shell`), started
-  the real dev server (`pnpm --filter web run dev`), and ran a small script that
-  screenshots `/` and `/workspace` at 1280×800 and `/workspace`/`/login` at
-  1280×800 and 400×800, checking `document.documentElement.scrollWidth` vs
-  `clientWidth` (to catch horizontal overflow) and browser console errors at each.
-  Result: zero horizontal overflow at any width/route, zero console errors, and the
-  screenshots (read back and visually inspected) confirmed: nav renders correctly
-  with session-appropriate links, the three-panel workspace layout matches the
-  intended design at desktop width, and at 400px width the panels correctly stack
-  vertically (search box → horizontally-scrollable category chip row → 3D
-  placeholder + camera buttons → details/compatibility text → summary bar) with
-  nothing clipped or overlapping. (One cosmetic note: the small floating "N" circle
-  visible bottom-left in the mobile screenshot is Next.js's own dev-mode indicator
-  overlay, not part of this app's UI — irrelevant in production.)
-- Re-ran `pnpm typecheck` (7/7 pass), `pnpm --filter web run lint` (clean), and
-  `pnpm build` (all 6 packages pass; note all `apps/web` routes are now dynamic
-  (ƒ) rather than partially static, because every page now renders under a layout
-  that calls `getServerSession` in `Nav` — expected, not a regression).
-- Dev server and the scratch Playwright setup were stopped/left in the scratch
-  directory (not committed); temp log files cleaned up.
+LAST COMPLETED STEP: Phase 1, Milestone 5 (components API — the final Phase 1
+milestone), fully verified against the live dev server.
+- `packages/shared/src/apiResponse.ts` (new): `ApiSuccess<T>`/`ApiFailure`/
+  `ApiResponse<T>` types plus `apiSuccess(data)`/`apiError(message, issues?)`
+  helpers — the `{ data, error }` envelope every route should return, never both
+  populated. Exported from `packages/shared/src/index.ts` (this package was an
+  empty stub until now). Added `"@pcbuilder/shared": "workspace:*"` to
+  `apps/web`'s dependencies.
+- Retrofitted `apps/web/app/api/auth/register/route.ts` to use `apiSuccess`/
+  `apiError` instead of hand-rolled `{ data, error }` object literals — same
+  behavior, now using the shared helper for consistency (verified with a live
+  request afterward; still returns 201/{id,email}).
+- `apps/web/app/api/components/route.ts` (new): `GET` — Zod query schema
+  (`category`, `brand`, `q`, `minPrice`/`maxPrice` via `z.coerce.number()`, `page`
+  default 1, `limit` default 20 max 100), builds a `Prisma.ComponentWhereInput`
+  (imported `Prisma` as a named export from `@pcbuilder/database`, which re-exports
+  everything from `@prisma/client`), filters to `isAvailable: true` plus whatever
+  optional filters were supplied, `model: { contains: q, mode: "insensitive" }` for
+  search. Returns `{ items, total, page, limit, totalPages }` with `category`/
+  `brand`/`inventory` included per item.
+- `apps/web/app/api/components/categories/route.ts` (new): `GET` — all
+  `ComponentCategory` rows ordered by `sortOrder`. Deliberately did NOT add a
+  separate `/api/components/search` route (it was in the original planned-routes
+  table in docs/API.md) — the `q` param on the list route already does this;
+  documented that decision in docs/API.md so nobody re-adds a duplicate route later.
+- `apps/web/app/api/components/[id]/route.ts` (new): `GET` — one `Component` with
+  `category`/`brand`/`inventory`/`threeDAssets` included, 404 via `apiError` if not
+  found. Uses the Next.js 16 App Router convention `{ params }: { params:
+  Promise<{ id: string }> }` then `await params` (confirmed this exact shape by
+  reading `node_modules/next/dist/docs/.../route.md`'s dynamic-segment example
+  rather than assuming — this is NOT the old synchronous `params` object from
+  older Next versions).
+- Confirmed static-segment-over-dynamic-segment routing works as expected:
+  `/api/components/categories` (literal) and `/api/components/[id]` (dynamic) both
+  exist under `app/api/components/` with no conflict — Next.js resolves the literal
+  segment first, standard behavior.
+- Rewired `apps/web/app/workspace/page.tsx` to query
+  `prisma.componentCategory.findMany({ orderBy: { sortOrder: "asc" } })` directly
+  (it's a server component — querying Prisma directly is correct here, not fetching
+  its own API route over HTTP) instead of importing a hardcoded array. Deleted
+  `apps/web/lib/categories.ts` (the placeholder from Milestone 4) since nothing
+  references it anymore.
+- **Verified against the real running dev server** (not just typecheck): `GET
+  /api/components/categories` → all 12 real categories with correct sortOrder; `GET
+  /api/components` (no filters) → all 7 seeded components; `?category=GPU` → just
+  the RTX 4070; `?q=ryzen` → just the 7800X3D; `?limit=1` → `total=7,
+  totalPages=7, items.length=1` (pagination math correct); `GET
+  /api/components/:realId` → full detail with category/brand/inventory populated
+  correctly; `GET /api/components/does-not-exist` → 404 with the expected error
+  envelope; `GET /api/components?minPrice=notanumber` → 400 with Zod's flattened
+  field error. Also re-verified `/workspace`'s rendered HTML contains all 12 real
+  category labels (not the old hardcoded 12 — same labels, but now sourced from the
+  database, confirmed by checking the page renders after the hardcoded file was
+  deleted and the build still succeeds).
+- `pnpm typecheck` (8/8 packages, including the new `packages/shared` build/
+  typecheck tasks), `pnpm --filter web run lint` (clean), and `pnpm build` (6/6,
+  all three new routes listed in the route table) all pass.
+- Cleaned up: deleted the two ad hoc test users created during verification
+  (`envelope-check@example.com` and, from the previous Milestone 3 session,
+  `tester@example.com` — already gone), stopped the dev server, removed temp
+  log/SQL scratch files each time.
 
 FILES CREATED:
-- apps/web/components/nav.tsx
-- apps/web/lib/categories.ts
-- apps/web/app/workspace/page.tsx
+- packages/shared/src/apiResponse.ts
+- apps/web/app/api/components/route.ts
+- apps/web/app/api/components/categories/route.ts
+- apps/web/app/api/components/[id]/route.ts
 
 FILES MODIFIED:
-- apps/web/app/globals.css (committed dark theme, fixed font-family)
-- apps/web/app/layout.tsx (renders <Nav /> inside <Providers>)
-- apps/web/app/page.tsx (simplified to a session-aware CTA linking to /workspace)
-- apps/web/app/login/page.tsx, apps/web/app/register/page.tsx,
-  apps/web/app/admin/page.tsx (restyled to the committed dark theme, dropped
-  `dark:` variants, fixed a stale "middleware.ts" comment)
-- project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
+- packages/shared/src/index.ts (now exports apiResponse instead of being empty)
+- packages/shared/package.json is unchanged (no new deps needed for this package)
+- apps/web/package.json (added @pcbuilder/shared workspace dependency)
+- apps/web/app/api/auth/register/route.ts (uses apiSuccess/apiError now)
+- apps/web/app/workspace/page.tsx (queries Prisma for categories instead of a
+  hardcoded array)
+- packages/shared/README.md, docs/API.md (documented the three new routes + the
+  envelope convention + why there's no separate /search route),
+  project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
   project-management/CURRENT_PHASE.md, project-management/PROJECT_STATUS.md,
   project-management/CHANGELOG.md (this checkpoint's sibling docs)
 
-DATABASE CHANGES: none this session.
+FILES DELETED:
+- apps/web/lib/categories.ts (superseded by the real Prisma query; nothing else
+  referenced it)
 
-API CHANGES: none this session (Milestone 5 is next).
+DATABASE CHANGES: none to the schema — only read queries added at the application
+layer. (Two throwaway test users were created and deleted during manual
+verification, as in every session so far; not part of the seed data.)
 
-FRONTEND CHANGES: see above — this whole session was frontend (nav + workspace shell
-+ theme + page restyling). No new dependencies were added to apps/web's package.json.
+API CHANGES: three new public GET routes, all documented above and in docs/API.md.
+No mutating component routes yet (create/update/delete are Phase 2's admin CRUD).
 
-3D ENGINE CHANGES: none — packages/three-d-engine is still an empty stub. The
-workspace page's 3D area is a static placeholder `<div>`, not a canvas.
+FRONTEND CHANGES: `/workspace` now shows real category data from the database
+instead of a hardcoded placeholder list; otherwise unchanged from Milestone 4's
+layout.
 
-KNOWN ISSUES: none new. The category chip row on the inventory panel scrolls
-horizontally below the `lg` breakpoint with no visible scroll affordance (no
-gradient fade or arrow hint) — acceptable for a placeholder list of static disabled
-buttons, worth a UX pass once Milestone 5's real category data and Phase 2's real
-filtering UI replace this list.
+3D ENGINE CHANGES: none — packages/three-d-engine is still an empty stub.
 
-TEST STATUS: still no automated test suite (expected until Phase 3). This milestone
-was verified visually via a real browser (Playwright screenshots + overflow/console
-checks) rather than via component tests, which is the right verification method for
-a pure-layout milestone with no business logic.
+KNOWN ISSUES: none new.
+
+TEST STATUS: still no automated test suite (expected until Phase 3, where the
+compatibility engine gets required Vitest coverage). This milestone's correctness
+was verified by exercising the real running server with real seeded data across
+every documented behavior (filter/search/paginate/detail/404/validation-error),
+which is the right verification method for CRUD-shaped routes with no complex
+business logic yet.
 
 NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md +
-CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes, then
-implement Phase 1, Milestone 5 (components API — the last Phase 1 milestone):
-`GET /api/components` (list/search/filter), `GET /api/components/categories`,
-`GET /api/components/:id`, all reading from `@pcbuilder/database`'s Prisma client
-against the seeded data from Milestone 2. Once that's real, replace
-`apps/web/lib/categories.ts`'s hardcoded list with an actual fetch (small follow-up
-inside the same milestone, not a separate one). Stop at that checkpoint rather than
-also starting Phase 2 (the full inventory admin system) in the same session.
+CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes and
+Postgres is running, then start PHASE 2 (Component Inventory System), Milestone 1:
+`packages/component-models` — Zod schemas for every component category's spec shape
+(Motherboard, CPU, GPU, RAM, SSD, PSU, Case, Fan, AIO, Air Cooler, Monitor, Case LCD,
+plus a generic/open schema for future categories — see ARCHITECTURE.md §5) and the
+per-category "hot field" extraction functions that populate `Component`'s indexed
+columns (socket/formFactor/ramType/pcieGeneration/lengthMm etc., per ARCHITECTURE.md
+§4.1). This is pure package/type work — no UI, no new API routes yet (the admin
+dashboard and CRUD that consume these schemas are Phase 2 Milestones 2-3). Stop at
+that checkpoint rather than also building the admin dashboard in the same session.
 
 EXACT COMMANDS TO RUN THE PROJECT LOCALLY:
   pnpm install
   pnpm dev                     # apps/web on http://localhost:3000
 
-Try it: `/` → "Preview workspace" / "Enter workspace" → `/workspace` shows the
-three-panel shell. `/register` → `/login` → nav shows your email/role + sign out;
-`/admin` still gated (promote via `UPDATE "User" SET role = 'ADMIN' WHERE email =
-...` — no admin UI yet).
+Try the new routes: `curl http://localhost:3000/api/components/categories`,
+`curl http://localhost:3000/api/components?category=GPU`,
+`curl http://localhost:3000/api/components?q=ryzen&limit=5`.
 
-One-time per machine / after a fresh clone (both already done on this machine):
+One-time per machine / after a fresh clone (all already done on this machine):
   cp packages/database/.env.example packages/database/.env
   pnpm --filter @pcbuilder/database run db:migrate
   pnpm --filter @pcbuilder/database run db:seed
@@ -147,11 +148,7 @@ PATH note (still applies): if `node`/`pnpm`/`npm`/`psql` report "not recognized"
 fresh shell, prepend, e.g. in PowerShell:
   $env:Path += ";C:\Program Files\nodejs;$env:APPDATA\npm;C:\Program Files\PostgreSQL\17\bin"
 
-If UI work needs a visual check again: Playwright is NOT a project dependency (kept
-out of apps/web on purpose) — it was installed ad hoc into a scratch directory
-outside the repo for this session's verification only. Reinstall the same way
-(`npm install playwright` + `npx playwright install chromium` in a scratch dir) if
-another session needs to screenshot the app; don't add it to apps/web's
-package.json unless the project actually adopts Playwright for real e2e tests
-(that's flagged as a Phase 3+/critical-UI-tests concern in docs/DEVELOPMENT.md, not
-decided yet).
+Playwright note (from the Milestone 4 checkpoint, still true): not a project
+dependency, was installed ad hoc into a scratch directory outside the repo for
+visual verification and not needed again unless another UI-heavy milestone needs
+the same kind of check.

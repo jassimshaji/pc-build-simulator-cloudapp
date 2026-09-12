@@ -20,7 +20,7 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] Prisma schema + initial migration + seed script
 - [COMPLETED] Auth (Auth.js v4 Credentials + JWT, RBAC roles, requireRole helper)
 - [COMPLETED] Base app shell UI (nav, three-panel workspace layout, theme)
-- [TODO] `/api/components` list/search/filter/get-by-id backed by real data
+- [COMPLETED] `/api/components` list/search/filter/get-by-id backed by real data
 
 ## Phase 2 — Component Inventory System
 - [TODO] Zod schemas for all component category spec shapes

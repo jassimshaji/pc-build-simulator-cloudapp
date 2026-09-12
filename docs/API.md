@@ -1,9 +1,18 @@
 # API Reference
 
-Status: auth routes implemented (Phase 1, Milestone 3); everything else is still
+Status: auth routes (Phase 1, Milestone 3) and read-only component routes (Phase 1,
+Milestone 5 — the last Phase 1 milestone) are implemented; everything else is still
 design-stage. This document will be filled in with real request/response shapes as
-each remaining route is built; for now it records the intended surface from
-`project-management/ARCHITECTURE.md`.
+each remaining route is built.
+
+## Conventions
+
+Every route returns `packages/shared`'s envelope: `{ data, error }`, never both
+populated (`apiSuccess(data)` / `apiError(message, issues?)` from
+`@pcbuilder/shared`). Query/body validation uses Zod; a validation failure returns
+`400` with `error.issues` set to the Zod flattened error. Mutating routes and
+role-gated routes will use `apps/web/lib/requireRole.ts` — never trust a
+client-supplied role.
 
 ## Implemented
 
@@ -20,6 +29,26 @@ next-auth v4's catch-all handler: `/api/auth/session`, `/api/auth/csrf`,
 the session/JWT carry `user.id` and `user.role` (see `apps/web/lib/auth.ts` and the
 module augmentation in `apps/web/types/next-auth.d.ts`).
 
+### `GET /api/components`
+Public. Query params (all optional): `category` (a `ComponentCategory.key`, e.g.
+`CPU`), `brand` (a `Brand.name`), `q` (case-insensitive substring match against
+`model`), `minPrice`/`maxPrice`, `page` (default 1), `limit` (default 20, max 100).
+Only `isAvailable: true` components are returned. Response:
+`{ data: { items: Component[], total, page, limit, totalPages }, error: null }`,
+each item including its `category`, `brand`, and `inventory` relations. `400` with
+Zod issues on an invalid query (e.g. `minPrice=notanumber`).
+
+### `GET /api/components/categories`
+Public. Returns every `ComponentCategory` row ordered by `sortOrder`:
+`{ data: ComponentCategory[], error: null }`. No separate `/api/components/search`
+route — search is the `q` param on the list route above, to avoid two routes doing
+the same query.
+
+### `GET /api/components/:id`
+Public. Returns one `Component` with `category`, `brand`, `inventory`, and
+`threeDAssets` included. `404` (`{ data: null, error: { message: "Component not
+found." } }`) if the id doesn't exist.
+
 ### Route protection
 - `apps/web/proxy.ts` (Next.js 16's renamed `middleware.ts` convention) gates
   `/admin/:path*`, redirecting to `/` unless the session's JWT role is `ADMIN` or
@@ -28,21 +57,10 @@ module augmentation in `apps/web/types/next-auth.d.ts`).
   the top of any server component or API route handler that needs role enforcement;
   never trust a client-supplied role.
 
-## Conventions (once implemented)
-- All responses use a consistent envelope: `{ data, error }` (never both populated).
-- Mutating routes validate input with a Zod schema before touching the database.
-- Protected routes read the Auth.js session; role checks go through a shared
-  `requireRole()` helper — never trust a client-supplied role.
-
-## Planned routes
+## Planned routes (Phase 2+)
 
 | Route | Methods | Purpose | Auth |
 |---|---|---|---|
-| `/api/auth/*` | — | Auth.js handlers (register/login/session) | public |
-| `/api/components` | GET | List/search/filter components | public |
-| `/api/components/categories` | GET | List component categories | public |
-| `/api/components/search` | GET | Full-text/spec search | public |
-| `/api/components/:id` | GET | Component detail | public |
 | `/api/components` | POST | Create component | ADMIN, INVENTORY_MANAGER |
 | `/api/components/:id` | PATCH/DELETE | Edit/delete component | ADMIN, INVENTORY_MANAGER |
 | `/api/inventory` | GET | Stock overview (low/out-of-stock, recent) | ADMIN, INVENTORY_MANAGER |
