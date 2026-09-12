@@ -1,0 +1,11 @@
+{
+  "daily_token_budget": 50000,
+  "warning_threshold_percent": 80,
+  "checkpoint_threshold_percent": 90,
+  "notes": [
+    "This budget is a soft, approximate working limit for scope-per-session, not an exact measured token count (the environment does not expose precise per-session token usage to the model).",
+    "Each development session should target ONE milestone from DEVELOPMENT_ROADMAP.md, sized to comfortably fit under this budget.",
+    "When a session's scope grows large (many files, large generated code, long exploration), stop at the next logical checkpoint rather than pushing further, even if the milestone isn't 100% finished.",
+    "Always update SESSION_CHECKPOINT.md before stopping so the next session (which may be a fresh context) can resume without rediscovery."
+  ]
+}
