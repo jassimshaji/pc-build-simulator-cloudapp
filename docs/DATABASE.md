@@ -59,5 +59,21 @@ ones with zero components yet, so adding real components later is pure data entr
 8 brands, 8 compatibility rule definitions, and 7 real-ish components (2 CPUs, 1
 motherboard, 1 GPU, 1 RAM kit, 1 PSU, 1 case) each with an `Inventory` row and a
 `PROCEDURAL_FALLBACK` `ThreeDAsset` pointing at the (not-yet-implemented) generic
-generator it'll use once `packages/three-d-engine` exists. The seed is upsert-based
-and safe to re-run.
+generator it'll use once `packages/three-d-engine` exists.
+
+Each component's `specifications` is validated against its category's real
+`@pcbuilder/component-models` schema at seed time (`validateSpecifications` /
+`extractHotFields` — the same functions `POST /api/components` uses), and the
+hot columns are *derived* from that validated data rather than hand-duplicated —
+`packages/database` depends on `@pcbuilder/component-models` for exactly this. An
+earlier version of this file set hot-column values (socket, tdpWatts, etc.) as
+separate literals alongside a `specifications` object that didn't also contain
+them; that drifted out of sync once the Zod schemas were added in a later
+milestone (discovered via a CSV export → re-import round trip in Phase 2,
+Milestone 5, which failed validation on exactly those fields). Keeping
+`specifications` as the single source of truth, with hot columns always derived
+from it, is what prevents that class of bug from recurring.
+
+The seed is upsert-based (both the `create` and `update` branches set the same
+fields) and safe to re-run against an already-seeded database — re-running it is
+in fact how the bug above was fixed live, without needing a migration reset.

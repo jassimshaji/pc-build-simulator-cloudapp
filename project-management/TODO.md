@@ -27,7 +27,7 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] Admin inventory dashboard (overview, low/out-of-stock, recently updated)
 - [COMPLETED] Admin CRUD for components (dynamic per-category spec form, image upload)
 - [COMPLETED] Stock management + brand/category management screens
-- [TODO] CSV import/export
+- [COMPLETED] CSV import/export
 - [TODO] 3D asset manager (upload GLTF/GLB, assign procedural fallback, license metadata)
 
 ## Phase 3 — Compatibility Engine & Power Calculation

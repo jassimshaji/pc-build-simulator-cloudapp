@@ -2,10 +2,10 @@
 
 Status: auth (Phase 1, Milestone 3), read-only component/category routes (Phase 1,
 Milestone 5), the inventory dashboard route (Phase 2, Milestone 2), admin CRUD +
-image upload (Phase 2, Milestone 3), and stock/brand/category management (Phase 2,
-Milestone 4) are all implemented; everything else is still design-stage. This
-document will be filled in with real request/response shapes as each remaining
-route is built.
+image upload (Phase 2, Milestone 3), stock/brand/category management (Phase 2,
+Milestone 4), and CSV import/export (Phase 2, Milestone 5) are all implemented;
+everything else is still design-stage. This document will be filled in with real
+request/response shapes as each remaining route is built.
 
 ## Conventions
 
@@ -134,6 +134,33 @@ exist and accept components.
 immutable (component-models' registry and every existing `Component` row key off of
 it; renaming it would silently break their category lookup). `DELETE`: `409` if any
 `Component` still uses the category, `404` if missing.
+
+### `GET /api/components/export`
+`ADMIN`/`INVENTORY_MANAGER` only. Streams every component (available or not) as a
+CSV file (`Content-Disposition: attachment`). Columns:
+`sku, categoryKey, brandName, model, price, description, images, isAvailable,
+stockQuantity, lowStockThreshold, specifications`. `images` and `specifications`
+are JSON-encoded into their single cell — arrays/objects vary per category, so
+rather than a bespoke per-field CSV schema, both use the same JSON representation
+the API already accepts (see `apps/web/lib/csv.ts`). Uses `Papa.unparse`, which
+defaults to CRLF line endings between rows — worth knowing if you ever hand-edit
+an exported file and re-append rows with a different line ending, since mixed
+line endings can confuse `papaparse`'s parser on re-import (discovered while
+testing this route).
+
+### `POST /api/components/import`
+`ADMIN`/`INVENTORY_MANAGER` only. Body: `multipart/form-data` with a `file` field
+(a CSV in the shape above). Upserts by `sku` — an existing SKU updates that
+component (re-validating `specifications` against its category and recomputing hot
+columns), a new SKU creates one (plus its `Inventory` row). Rows are processed
+independently, NOT in one all-or-nothing transaction: a bad row (unknown category,
+invalid specifications, unparseable JSON, non-numeric price, ...) is skipped and
+reported rather than aborting the whole file. Returns
+`{ data: { total, created, updated, failed: [{ row, sku?, error }] }, error: null }`
+(`row` is 1-indexed counting the header as row 1, matching what a human opening the
+CSV in a spreadsheet would see). `400` only if the CSV itself fails to parse at all
+(malformed quoting, etc.) — per-row data problems are reported in `failed`, not as
+an HTTP error.
 
 ### Route protection
 - `apps/web/proxy.ts` (Next.js 16's renamed `middleware.ts` convention) gates

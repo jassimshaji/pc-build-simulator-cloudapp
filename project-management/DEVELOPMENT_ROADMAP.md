@@ -120,7 +120,23 @@ Milestones (each independently shippable):
    on real in-use rows (AMD brand, CPU category) and the inline stock editor
    confirmed via a Playwright screenshot showing the updated value reflected after
    save. All test data reverted afterward.
-5. `[ ]` CSV import/export for bulk inventory operations.
+5. `[x]` CSV import/export for bulk inventory operations. **Done 2026-09-12** —
+   `GET /api/components/export` (streams a CSV, `images`/`specifications` as
+   JSON-encoded cells) and `POST /api/components/import` (multipart upload,
+   upserts by SKU, per-row error reporting rather than an all-or-nothing
+   transaction), plus an `/admin/import-export` page. Verified with a full
+   export → hand-edited (added a valid new row + a deliberately broken one) →
+   re-import round trip against the live server: 9 processed, correct
+   created/updated counts, the broken row reported with a clear error, all real
+   rows round-tripped cleanly. **That round trip surfaced a real pre-existing
+   bug**: several seeded components' `specifications` were missing fields their
+   own Zod schemas required (the hot-column values had been set as separate
+   literals in `seed.ts`, written before `component-models` existed, instead of
+   also living inside `specifications`). Fixed by making `seed.ts` derive hot
+   columns from `specifications` via `validateSpecifications`/`extractHotFields`
+   (same functions the real API uses) instead of duplicating them by hand, and
+   re-ran the seed against the live database to correct the existing rows —
+   documented in `docs/DATABASE.md` and `DECISIONS.md`.
 6. `[ ]` 3D asset manager: upload GLTF/GLB, assign procedural fallback, record
    source/license/attribution.
 

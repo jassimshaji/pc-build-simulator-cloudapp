@@ -2,6 +2,28 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 2, Milestone 5: CSV import/export
+- Added `GET /api/components/export` and `POST /api/components/import`
+  (multipart, upserts by SKU, per-row error reporting rather than an
+  all-or-nothing transaction), plus an `/admin/import-export` page.
+- Verified with a live export → hand-edit → re-import round trip: correct
+  created/updated counts, a clear error for a deliberately broken row.
+- **That round trip surfaced a real pre-existing bug**: several seeded
+  components' `specifications` were missing fields their own Zod schemas
+  required, because `seed.ts` (written before `@pcbuilder/component-models`
+  existed) had set hot-column values as separate literals instead of also
+  including them in `specifications` — contradicting the hybrid schema's own
+  documented design (ADR-002). Fixed `seed.ts` to derive hot columns from
+  `specifications` via the same functions the real API uses, fixed the seed's
+  upsert (previously a no-op `update`, so it wouldn't have corrected
+  already-seeded rows), and re-ran it against the live database to fix the data
+  in place. Documented as ADR-009.
+- Also found and repaired an unrelated pre-existing corruption in
+  `project-management/DECISIONS.md` from an earlier session (ADR-007's heading
+  had been lost, merged into ADR-008's text) — restored proper structure.
+- Stopped at the Phase 2 / Milestone 5 checkpoint; the 3D asset manager
+  (Milestone 6, the last Phase 2 milestone) is next, pending user "Continue".
+
 ## 2026-09-12 — Phase 2, Milestone 4: Stock management + brand/category management
 - Added `POST /api/inventory/update` (dedicated stock-quantity/threshold fast path)
   and an inline stock editor on every admin dashboard table row.

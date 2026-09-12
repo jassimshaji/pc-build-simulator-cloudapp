@@ -100,6 +100,12 @@ export default async function AdminPage({
               Categories
             </Link>
             <Link
+              href="/admin/import-export"
+              className="rounded border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200"
+            >
+              Import / Export
+            </Link>
+            <Link
               href="/admin/components/new"
               className="rounded bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-950"
             >
@@ -170,7 +176,7 @@ export default async function AdminPage({
         </section>
 
         <p className="text-xs text-zinc-600">
-          CSV import/export and the 3D asset manager land in Phase 2, Milestones 5-6.
+          The 3D asset manager lands in Phase 2, Milestone 6.
         </p>
       </div>
     </div>

@@ -42,7 +42,9 @@ index on `specifications` covers ad-hoc filtering on the long tail.
 **Consequences:** New categories or new spec fields within a category never require a
 migration unless that specific field needs to become a compatibility/filter hot-path
 field. The "promoted fields" list is expected to grow slowly and deliberately — adding
-one is a small, reviewable migration, not a redesign.
+one is a small, reviewable migration, not a redesign. Note (added via ADR-009): the
+"*also*" is load-bearing — hot columns are a supplementary copy of data that must
+also live in `specifications`, never a replacement for it.
 
 ---
 
@@ -126,6 +128,39 @@ is running.
 
 ---
 
+## ADR-007: next-auth v4 (not v5), and no Prisma adapter for Credentials + JWT auth
+
+**Context:** The original plan (ARCHITECTURE.md, written in Phase 0) said "Auth.js
+(NextAuth v5) — Credentials provider + JWT session, Prisma adapter." When it came time
+to actually install it, `pnpm add next-auth` resolved to `next-auth@4.24.15` — v5
+either isn't tagged `latest` yet or doesn't exist as a stable release at
+implementation time. Separately: a database adapter (`@auth/prisma-adapter`) exists to
+persist OAuth accounts and/or database-backed sessions (it manages `Account`,
+`Session`, `VerificationToken` tables). This app only uses the Credentials provider
+with JWT sessions — no OAuth, no database sessions — so the adapter has nothing to do;
+adding it now would mean adding three unused tables to the schema for no behavior.
+
+**Decision:** Use `next-auth@4` as installed. Its Credentials provider's `authorize()`
+callback queries the existing `User` model directly via the `@pcbuilder/database`
+Prisma client (no adapter). Role-based access uses `next-auth/middleware`'s
+`withAuth()` (file named `proxy.ts`, not `middleware.ts` — Next.js 16 renamed the
+convention, see below) for route-level gating plus a shared `requireRole()` helper
+(`apps/web/lib/requireRole.ts`) for server-side/API-route enforcement that always
+re-reads the session server-side rather than trusting any client-supplied role.
+
+**Also noted:** Next.js 16 deprecated the `middleware.ts` file convention in favor of
+`proxy.ts` (same `withAuth()`-wrapped function, just renamed — "the functionality
+remains the same" per Next's own docs). The file was named `proxy.ts` from the start
+here to avoid the deprecation warning.
+
+**Consequences:** If/when OAuth providers (Google, GitHub, etc.) are added later,
+that's the point to add `@auth/prisma-adapter` and its tables — a schema migration at
+that time, not now. If next-auth v5 becomes the clearly-current stable release before
+that point, upgrading is a reasonably contained change (the Credentials + JWT pattern
+maps fairly directly onto v5's API) but is not being chased proactively.
+
+---
+
 ## ADR-008: SeaweedFS (not MinIO) as the local object storage stand-in for R2
 
 **Context:** Phase 2, Milestone 3 needs real image upload for admin CRUD. No
@@ -166,33 +201,45 @@ exists) — the binary lives at `C:\seaweedfs\weed.exe`, outside the repo, and m
 started manually each dev session (see docs/DEVELOPMENT.md). This is a bigger manual
 step than Postgres (which runs as an actual Windows service) — worth automating
 later (e.g. a real Windows service registration) if object storage becomes a
-frequent part of the dev loop.: next-auth v4 (not v5), and no Prisma adapter for Credentials + JWT auth
+frequent part of the dev loop.
 
-**Context:** The original plan (ARCHITECTURE.md, written in Phase 0) said "Auth.js
-(NextAuth v5) — Credentials provider + JWT session, Prisma adapter." When it came time
-to actually install it, `pnpm add next-auth` resolved to `next-auth@4.24.15` — v5
-either isn't tagged `latest` yet or doesn't exist as a stable release at
-implementation time. Separately: a database adapter (`@auth/prisma-adapter`) exists to
-persist OAuth accounts and/or database-backed sessions (it manages `Account`,
-`Session`, `VerificationToken` tables). This app only uses the Credentials provider
-with JWT sessions — no OAuth, no database sessions — so the adapter has nothing to do;
-adding it now would mean adding three unused tables to the schema for no behavior.
+---
 
-**Decision:** Use `next-auth@4` as installed. Its Credentials provider's `authorize()`
-callback queries the existing `User` model directly via the `@pcbuilder/database`
-Prisma client (no adapter). Role-based access uses `next-auth/middleware`'s
-`withAuth()` (file named `proxy.ts`, not `middleware.ts` — Next.js 16 renamed the
-convention, see below) for route-level gating plus a shared `requireRole()` helper
-(`apps/web/lib/requireRole.ts`) for server-side/API-route enforcement that always
-re-reads the session server-side rather than trusting any client-supplied role.
+## ADR-009: Seed data must derive hot columns from `specifications`, never duplicate them
 
-**Also noted:** Next.js 16 deprecated the `middleware.ts` file convention in favor of
-`proxy.ts` (same `withAuth()`-wrapped function, just renamed — "the functionality
-remains the same" per Next's own docs). The file was named `proxy.ts` from the start
-here to avoid the deprecation warning.
+**Context:** `packages/database/prisma/seed.ts` was written in Phase 1, Milestone 2 —
+before `@pcbuilder/component-models` existed (Phase 2, Milestone 1). It set each
+component's hot columns (`socket`, `tdpWatts`, `formFactor`, `ramType`,
+`pcieGeneration`, `lengthMm`/`widthMm`/`heightMm`, `wattage`) as separate literal
+values alongside a `specifications` object that, for CPU/GPU/Motherboard/PSU/RAM,
+didn't also contain those same fields. This directly contradicted ADR-002's design
+(hot columns are promoted *in addition to* full data in `specifications`, not
+instead of it) but nothing caught it at the time, because nothing had ever
+re-validated the seed data against the real category schemas — the schemas didn't
+exist yet when the seed data was written, and nothing re-checked it afterward.
 
-**Consequences:** If/when OAuth providers (Google, GitHub, etc.) are added later,
-that's the point to add `@auth/prisma-adapter` and its tables — a schema migration at
-that time, not now. If next-auth v5 becomes the clearly-current stable release before
-that point, upgrading is a reasonably contained change (the Credentials + JWT pattern
-maps fairly directly onto v5's API) but is not being chased proactively.
+It surfaced in Phase 2, Milestone 5 via a CSV export → hand-edit → re-import round
+trip: the export correctly serialized each component's actual `specifications`
+(missing those fields), and re-importing that same data failed
+`validateSpecifications` for 6 of the 7 seeded components — `socket`/`tdpWatts`
+"expected string/number, received undefined," etc.
+
+**Decision:** `seed.ts` now puts every schema-required field inside each
+component's `specifications` object (the complete, category-correct spec), then
+calls the same `validateSpecifications()` + `extractHotFields()` functions
+`POST /api/components` uses to derive the hot columns — never sets them as
+separate literals. `packages/database` now depends on
+`@pcbuilder/component-models` for this. The upsert's `update` branch also mirrors
+`create` (it was previously a no-op `{}`, meaning a fixed seed script would have
+silently failed to correct already-seeded rows) so re-running the seed against a
+live, already-seeded database actually fixes drifted rows — which is how the live
+database was corrected this session, without a migration reset.
+
+**Consequences:** Any future seed/fixture data is validated by construction — it's
+structurally impossible to add a seed component whose `specifications` doesn't
+satisfy its own category schema, because the hot columns are computed FROM the
+validated data rather than supplied independently. The general lesson (worth
+remembering for any future fixture/import code): whenever two representations of
+the same data can exist (a full spec object and promoted columns derived from it),
+derive one from the other programmatically — never hand-maintain both, even for
+"just seed data."
