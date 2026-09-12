@@ -92,8 +92,21 @@ Milestones (each independently shippable):
    rendered dashboard HTML reflected them correctly, confirmed search-by-model
    works, confirmed `/api/inventory` 401s when unauthenticated, then reverted the
    test stock changes.
-3. `[ ]` Admin CRUD: create/edit/delete component, per-category dynamic spec form
-   generated from the Zod schema, image upload to R2.
+3. `[x]` Admin CRUD: create/edit/delete component, per-category dynamic spec form
+   generated from the Zod schema, image upload to R2. **Done 2026-09-12** —
+   `POST/PATCH/DELETE /api/components(/:id)` plus `POST /api/assets` (presigned
+   upload URL). Image upload targets a self-hosted SeaweedFS S3 gateway locally
+   (MinIO's community server was discontinued — see ADR-008) since no Cloudflare R2
+   bucket is provisioned; same S3 API/env vars either way. The dynamic spec form
+   (`apps/web/lib/zod-form.ts` + `component-form.tsx`) introspects
+   `@pcbuilder/component-models`'s real Zod v4 schemas at runtime (verified Zod v4's
+   actual internal shape empirically rather than assumed from v3) to render the
+   right fields per category, including nested objects (e.g. `dimensionsMm`) and
+   comma-separated array inputs. Verified with a full Playwright browser run against
+   the live dev server: logged in, created a Monitor component (dynamic fields +
+   real image upload), confirmed it via search, edited its price, confirmed the
+   edit persisted, deleted it, confirmed it was gone — every step against real
+   server responses, not mocked.
 4. `[ ]` Stock management: update quantity, mark unavailable, brand/category
    management screens.
 5. `[ ]` CSV import/export for bulk inventory operations.

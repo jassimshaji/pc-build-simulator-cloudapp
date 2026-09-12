@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/requireRole";
 import { getInventoryOverview, searchAllComponents, type InventoryRow } from "@/lib/inventory";
+import { DeleteComponentButton } from "./delete-component-button";
 
 function ComponentTable({ rows, emptyMessage }: { rows: InventoryRow[]; emptyMessage: string }) {
   if (rows.length === 0) {
@@ -9,7 +11,7 @@ function ComponentTable({ rows, emptyMessage }: { rows: InventoryRow[]; emptyMes
 
   return (
     <div className="overflow-x-auto rounded border border-zinc-800">
-      <table className="w-full min-w-[640px] text-left text-sm">
+      <table className="w-full min-w-[720px] text-left text-sm">
         <thead className="border-b border-zinc-800 bg-zinc-900/60 text-zinc-400">
           <tr>
             <th className="px-3 py-2 font-medium">Model</th>
@@ -18,6 +20,7 @@ function ComponentTable({ rows, emptyMessage }: { rows: InventoryRow[]; emptyMes
             <th className="px-3 py-2 font-medium">Brand</th>
             <th className="px-3 py-2 font-medium">Stock</th>
             <th className="px-3 py-2 font-medium">Updated</th>
+            <th className="px-3 py-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -37,6 +40,14 @@ function ComponentTable({ rows, emptyMessage }: { rows: InventoryRow[]; emptyMes
               <td className="px-3 py-2 text-zinc-400">{row.stockQuantity}</td>
               <td className="px-3 py-2 text-zinc-400">
                 {row.updatedAt.toLocaleDateString()}
+              </td>
+              <td className="px-3 py-2">
+                <div className="flex gap-3">
+                  <Link href={`/admin/components/${row.id}/edit`} className="text-zinc-300 hover:underline">
+                    Edit
+                  </Link>
+                  <DeleteComponentButton id={row.id} model={row.model} />
+                </div>
               </td>
             </tr>
           ))}
@@ -65,11 +76,19 @@ export default async function AdminPage({
   return (
     <div className="flex-1 px-4 py-10">
       <div className="mx-auto max-w-4xl space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold">Inventory Admin</h1>
-          <p className="text-zinc-400">
-            Signed in as {result.session.user.email} ({result.session.user.role}).
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold">Inventory Admin</h1>
+            <p className="text-zinc-400">
+              Signed in as {result.session.user.email} ({result.session.user.role}).
+            </p>
+          </div>
+          <Link
+            href="/admin/components/new"
+            className="rounded bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-950"
+          >
+            New component
+          </Link>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
@@ -134,8 +153,8 @@ export default async function AdminPage({
         </section>
 
         <p className="text-xs text-zinc-600">
-          Editing components, stock updates, and brand/category management land in
-          Phase 2, Milestones 3-4.
+          Stock quantity updates and brand/category management land in Phase 2,
+          Milestone 4.
         </p>
       </div>
     </div>

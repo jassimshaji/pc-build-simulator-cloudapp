@@ -2,6 +2,31 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 2, Milestone 3: Admin CRUD + image upload
+- Added `POST /api/components`, `PATCH /api/components/:id`,
+  `DELETE /api/components/:id`, and `POST /api/assets` (presigned upload URL) —
+  all role-gated. `specifications` validated per-category via
+  `@pcbuilder/component-models`; hot columns always derived server-side.
+- Object storage detour: MinIO (the planned open-source local stand-in for
+  Cloudflare R2) turned out to have been discontinued (`dl.min.io` now 410s).
+  Installed **SeaweedFS** instead — another open-source, S3-compatible, actively
+  maintained server — documented as ADR-008. Hit and fixed a real AWS SDK v3
+  gotcha along the way: presigned PUT URLs need `requestChecksumCalculation:
+  "WHEN_REQUIRED"` or they fail with 400 BadDigest against any S3-compatible
+  server, not just SeaweedFS.
+- Built `apps/web/lib/zod-form.ts`: introspects any component-models Zod schema at
+  runtime into a form field list, verified against Zod v4's actual internal shape
+  empirically (not assumed from v3). Powers a genuinely dynamic per-category admin
+  form — `apps/web/app/admin/components/component-form.tsx`.
+- Added `/admin/components/new` and `/admin/components/:id/edit` pages, plus
+  Edit/Delete actions on the dashboard's tables.
+- Verified with a full Playwright browser session against the live dev server:
+  created a Monitor-category component through the real form (including a real
+  image upload), confirmed via search, edited it, confirmed the edit persisted,
+  deleted it, confirmed it was gone.
+- Stopped at the Phase 2 / Milestone 3 checkpoint; stock/brand/category management
+  (Milestone 4) is next, pending user "Continue".
+
 ## 2026-09-12 — Phase 2, Milestone 2: Admin inventory dashboard
 - Added `apps/web/lib/inventory.ts` (`getInventoryOverview()`,
   `searchAllComponents()`) and `GET /api/inventory` (role-gated,

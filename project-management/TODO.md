@@ -25,7 +25,7 @@ of duplicates — update status in place rather than re-adding a task.
 ## Phase 2 — Component Inventory System
 - [COMPLETED] Zod schemas for all component category spec shapes
 - [COMPLETED] Admin inventory dashboard (overview, low/out-of-stock, recently updated)
-- [TODO] Admin CRUD for components (dynamic per-category spec form, image upload)
+- [COMPLETED] Admin CRUD for components (dynamic per-category spec form, image upload)
 - [TODO] Stock management + brand/category management screens
 - [TODO] CSV import/export
 - [TODO] 3D asset manager (upload GLTF/GLB, assign procedural fallback, license metadata)

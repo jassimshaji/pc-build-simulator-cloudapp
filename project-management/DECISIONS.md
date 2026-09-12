@@ -126,7 +126,47 @@ is running.
 
 ---
 
-## ADR-007: next-auth v4 (not v5), and no Prisma adapter for Credentials + JWT auth
+## ADR-008: SeaweedFS (not MinIO) as the local object storage stand-in for R2
+
+**Context:** Phase 2, Milestone 3 needs real image upload for admin CRUD. No
+Cloudflare R2 bucket is provisioned (would need the user's Cloudflare account). The
+user asked for an open-source local alternative. MinIO was the obvious first choice
+— open-source, S3-compatible, native Windows binary, same pattern as installing
+Postgres/Node locally in earlier milestones. However, MinIO's community/open-source
+server turned out to have been discontinued: `dl.min.io` now serves a 410 Gone
+archival notice for all server/client downloads, and `winget install MinIO.Server`
+fails for the same reason (its manifest points at an archived release URL). This
+wasn't knowable from training data — it's a very recent (2026) change.
+
+**Decision:** Use **SeaweedFS** instead — another open-source, actively maintained,
+S3-compatible object storage server, with Windows binaries published on its GitHub
+releases (`seaweedfs/seaweedfs`, asset `windows_amd64.zip`). Run as a single-node
+`weed server -s3 ...` process (master+volume+filer+S3 gateway together — appropriate
+for local dev, not how you'd run it in production). IAM config
+(`infrastructure/seaweedfs/s3-config.json`) defines one read/write credential for the
+app plus an `anonymous` read-only identity, so uploaded images are publicly
+viewable via plain URLs without needing signed GET requests — matching how a
+real R2 bucket serving public assets would be configured.
+
+**Environment gotcha hit and fixed:** presigned PUT URLs from `@aws-sdk/client-s3`
+failed against SeaweedFS with `400 BadDigest` until `requestChecksumCalculation:
+"WHEN_REQUIRED"` was set on the `S3Client` config. Newer AWS SDK v3 versions default
+to embedding a checksum (computed from the — at signing time, empty/unknown — body)
+into presigned URLs, which then can't match whatever bytes the client actually
+uploads later. This isn't SeaweedFS-specific; it affects presigned uploads against
+real S3/R2 too and is a known SDK default that needs overriding for this pattern.
+See `apps/web/lib/storage.ts` for where this is set, with the reasoning inline.
+
+**Consequences:** `apps/web/lib/storage.ts` is written against the plain S3 API via
+env vars (`S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
+`S3_BUCKET_NAME`, `S3_PUBLIC_URL`, `S3_FORCE_PATH_STYLE`) — switching to real
+Cloudflare R2 in production is a configuration change, not a code change. SeaweedFS
+itself is NOT installed via any package manager on this machine (no winget package
+exists) — the binary lives at `C:\seaweedfs\weed.exe`, outside the repo, and must be
+started manually each dev session (see docs/DEVELOPMENT.md). This is a bigger manual
+step than Postgres (which runs as an actual Windows service) — worth automating
+later (e.g. a real Windows service registration) if object storage becomes a
+frequent part of the dev loop.: next-auth v4 (not v5), and no Prisma adapter for Credentials + JWT auth
 
 **Context:** The original plan (ARCHITECTURE.md, written in Phase 0) said "Auth.js
 (NextAuth v5) — Credentials provider + JWT session, Prisma adapter." When it came time

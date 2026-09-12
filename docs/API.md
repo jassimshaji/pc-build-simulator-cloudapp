@@ -1,7 +1,8 @@
 # API Reference
 
-Status: auth routes (Phase 1, Milestone 3) and read-only component routes (Phase 1,
-Milestone 5 — the last Phase 1 milestone) are implemented; everything else is still
+Status: auth (Phase 1, Milestone 3), read-only component/category routes (Phase 1,
+Milestone 5), the inventory dashboard route (Phase 2, Milestone 2), and admin CRUD +
+image upload (Phase 2, Milestone 3) are all implemented; everything else is still
 design-stage. This document will be filled in with real request/response shapes as
 each remaining route is built.
 
@@ -49,6 +50,43 @@ Public. Returns one `Component` with `category`, `brand`, `inventory`, and
 `threeDAssets` included. `404` (`{ data: null, error: { message: "Component not
 found." } }`) if the id doesn't exist.
 
+### `POST /api/components`
+`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ sku, categoryKey, brandName, model,
+price, description?, images?: string[], isAvailable?, specifications: unknown }`.
+`categoryKey` must match an existing `ComponentCategory.key` (`400` otherwise);
+`brandName` is upserted (creates the brand if it doesn't exist yet); `sku` must be
+unique (`409` otherwise). `specifications` is validated against the category's own
+schema via `@pcbuilder/component-models`'s `validateSpecifications` — NOT by this
+route's own Zod schema, which only covers the fields every category shares (`400`
+with the category schema's own issues on failure). The `Component`'s hot columns
+(socket/formFactor/ramType/etc.) are derived from the validated specifications via
+`extractHotFields` — never taken from client input directly. Creates a matching
+`Inventory` row (`stockQuantity: 0`) alongside the component. `201` with the created
+component (relations included) on success.
+
+### `PATCH /api/components/:id`
+`ADMIN`/`INVENTORY_MANAGER` only. Body (all optional): `brandName, model, price,
+description, images, isAvailable, specifications`. `categoryKey` and `sku` are
+immutable — recategorizing or re-skuing a component is delete-and-recreate, not an
+edit. If `specifications` is provided it's re-validated against the component's
+existing category and hot columns are recomputed. `404` if the id doesn't exist.
+
+### `DELETE /api/components/:id`
+`ADMIN`/`INVENTORY_MANAGER` only. `404` if the id doesn't exist. `409` if the
+component is referenced by a saved build's `BuildComponent` row (foreign key
+constraint — no builds exist yet as of Phase 2, so this is currently unreachable in
+practice, but handled rather than surfacing a raw 500).
+
+### `POST /api/assets`
+`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ filename: string, contentType: string }`
+— `contentType` must be one of `image/png`, `image/jpeg`, `image/webp`, `image/gif`.
+Returns `{ uploadUrl, publicUrl, key }`: `uploadUrl` is a short-lived (5 min)
+presigned S3 PUT URL the client uploads the file bytes to directly (this route never
+sees the file itself — see ARCHITECTURE.md §9); `publicUrl` is what to store as the
+component's image URL once the upload succeeds. See `apps/web/lib/storage.ts` and
+`docs/DEVELOPMENT.md`'s object storage section for the local (SeaweedFS) vs.
+production (Cloudflare R2) setup — same code, different env vars.
+
 ### `GET /api/inventory`
 `ADMIN`/`INVENTORY_MANAGER` only (`401` if unauthenticated, `403` for a `USER`
 session — via `requireRole`). Returns
@@ -71,12 +109,9 @@ directly by both the page and this route to avoid duplicating the query logic).
 
 | Route | Methods | Purpose | Auth |
 |---|---|---|---|
-| `/api/components` | POST | Create component | ADMIN, INVENTORY_MANAGER |
-| `/api/components/:id` | PATCH/DELETE | Edit/delete component | ADMIN, INVENTORY_MANAGER |
 | `/api/inventory/update` | POST | Update stock quantity / availability | ADMIN, INVENTORY_MANAGER |
 | `/api/builds` | GET/POST | List/create user builds | USER+ |
 | `/api/builds/:id` | GET/PATCH/DELETE | Load/update/delete a build | owner or ADMIN |
 | `/api/compatibility/check` | POST | Run the compatibility engine against a build/component set | USER+ |
-| `/api/assets` | GET/POST | List / request upload URL for 3D assets & images | ADMIN, INVENTORY_MANAGER |
 
 Each route will be documented here with request/response JSON examples as it's built.

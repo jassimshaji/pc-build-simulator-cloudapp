@@ -1,0 +1,18 @@
+{
+  "identities": [
+    {
+      "name": "pcbuilder",
+      "credentials": [
+        {
+          "accessKey": "pcbuilder",
+          "secretKey": "pcbuilderlocaldev"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    },
+    {
+      "name": "anonymous",
+      "actions": ["Read"]
+    }
+  ]
+}

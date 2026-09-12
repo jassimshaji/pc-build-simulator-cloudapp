@@ -12,9 +12,10 @@ pnpm dev              # runs apps/web via Turborepo -> http://localhost:3000
 Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` — each
 runs across every workspace package via Turborepo.
 
-Only `apps/web` does anything right now (the Next.js starter page). The `packages/*`
-workspaces are empty stubs (`export {}`) that typecheck/build successfully but have no
-real code yet — that lands in Phases 2-4.
+`apps/web` is a real app (auth, admin CRUD, component APIs — see below).
+`packages/database` and `packages/component-models` have real code;
+`packages/compatibility-engine`, `packages/three-d-engine`, and `packages/shared`'s
+non-`apiResponse` parts are still stubs pending Phases 3-4.
 
 ## Database (Phase 1, Milestone 2 — done)
 
@@ -47,8 +48,42 @@ everyone else). To promote a user to admin for local testing (no admin UI yet):
 UPDATE "User" SET role = 'ADMIN' WHERE email = 'you@example.com';
 ```
 
-`apps/web` still does not read component/inventory data from the database (no
-non-auth API routes exist yet — that's Phase 1, Milestone 5).
+## Object storage / image uploads (Phase 2, Milestone 3 — done)
+
+Component image uploads need an S3-compatible object store. Production targets
+Cloudflare R2 (ARCHITECTURE.md §8); locally this runs against a self-hosted
+**SeaweedFS** server (open-source, actively maintained — MinIO's community server
+was discontinued as of this writing, see `project-management/DECISIONS.md` ADR-008).
+
+One-time setup (Windows; no package manager has it, so this is a manual binary
+download):
+
+```powershell
+New-Item -ItemType Directory -Force -Path "C:\seaweedfs"
+Invoke-WebRequest -Uri "https://github.com/seaweedfs/seaweedfs/releases/latest/download/windows_amd64.zip" -OutFile "C:\seaweedfs\windows_amd64.zip"
+Expand-Archive -Path "C:\seaweedfs\windows_amd64.zip" -DestinationPath "C:\seaweedfs" -Force
+```
+
+Every dev session, start it before `pnpm dev` if you need image upload to work
+(nothing else in the app depends on it being up):
+
+```powershell
+& "C:\seaweedfs\weed.exe" server `
+  -dir=C:\seaweedfs\data `
+  -s3 -s3.port=8333 `
+  -s3.config="<repo-path>\infrastructure\seaweedfs\s3-config.json" `
+  -s3.autoCreateBucket=true `
+  -ip=127.0.0.1 -master.port=9333 -volume.port=8080 -filer.port=8888
+```
+
+`apps/web/.env.local` needs the matching `S3_*` vars (see `apps/web/.env.example`) —
+already set on this machine to match the config above (`pcbuilder`/`pcbuilderlocaldev`
+credentials, bucket `pc-builder-assets`, endpoint `http://127.0.0.1:8333`).
+
+Unlike Postgres (installed as an actual Windows service, always running), SeaweedFS
+is a plain background process you start manually — there's no Windows service
+registration for it here. If image upload tests fail with a connection error, check
+whether `weed.exe` is actually running.
 
 ## Testing strategy
 
