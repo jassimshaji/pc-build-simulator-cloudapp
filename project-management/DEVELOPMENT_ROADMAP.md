@@ -137,8 +137,24 @@ Milestones (each independently shippable):
    (same functions the real API uses) instead of duplicating them by hand, and
    re-ran the seed against the live database to correct the existing rows —
    documented in `docs/DATABASE.md` and `DECISIONS.md`.
-6. `[ ]` 3D asset manager: upload GLTF/GLB, assign procedural fallback, record
-   source/license/attribution.
+6. `[x]` 3D asset manager: upload GLTF/GLB, assign procedural fallback, record
+   source/license/attribution. **Done 2026-09-12 — Phase 2 complete.**
+   `PUT /api/components/:id/asset` (upserts the component's `ThreeDAsset`, full
+   `PUT` replace semantics, kind-conditional validation — `url` required for
+   `GLTF_MODEL`, `proceduralGeneratorKey` required for `PROCEDURAL_FALLBACK`) and
+   `POST /api/assets` extended with a `purpose: "image" | "model"` field (models
+   accept `model/gltf-binary`/`model/gltf+json`/`application/octet-stream`, the
+   last one because browsers almost never report a real MIME type for `.glb`).
+   `/admin/components/:id/asset` page + form: switch kind, upload a real GLTF/GLB
+   via the same presigned-URL pattern as image upload, pick a procedural generator
+   from the names ARCHITECTURE.md §7.3 documents (none implemented yet —
+   packages/three-d-engine is Phase 4 — recording the choice is a data decision
+   now, same pattern as categories existing before their schemas). Verified live:
+   uploaded a real (fake-content) .glb through the actual presigned flow,
+   confirmed public read-back of the exact bytes, confirmed switching kinds
+   upserts the same row rather than creating duplicates, confirmed kind-specific
+   validation 400s correctly, confirmed via Playwright that the form's conditional
+   fields (generator dropdown vs. file input) render correctly per kind.
 
 ---
 

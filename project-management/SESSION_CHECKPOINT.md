@@ -1,175 +1,167 @@
 SESSION DATE: 2026-09-12
 
-CURRENT PHASE: Phase 2 — Component Inventory System (Milestone 5 of 6 complete)
+CURRENT PHASE: Phase 2 COMPLETE (all 6 milestones). Next: Phase 3 — Compatibility
+Engine & Power Calculation.
 
-CURRENT TASK: None in progress — awaiting user instruction for Milestone 6 (3D asset
-manager, the last Phase 2 milestone).
+CURRENT TASK: None in progress — awaiting user instruction for Phase 3, Milestone 1
+(`packages/compatibility-engine` scaffold).
 
-LAST COMPLETED STEP: Phase 2, Milestone 5 (CSV import/export), fully verified — and
-along the way, found and fixed a real pre-existing data bug plus a real pre-existing
-documentation corruption, neither introduced this session.
+LAST COMPLETED STEP: Phase 2, Milestone 6 (3D asset manager — the final Phase 2
+milestone), fully verified against the live dev server.
 
-**CSV import/export implementation:**
-- `apps/web/lib/csv.ts` (new): `CSV_COLUMNS` (sku, categoryKey, brandName, model,
-  price, description, images, isAvailable, stockQuantity, lowStockThreshold,
-  specifications), `componentToCsvRow()`, and `parseCsvRow()` (throws a plain
-  `Error` with a human-readable message on any problem — the import route catches
-  this per-row). `images` and `specifications` are JSON-encoded into a single CSV
-  cell each — decided without needing to ask the user, since it's a technical
-  encoding question with a clear answer (mirrors exactly what the JSON API already
-  accepts for these fields, so a round trip through export → hand-edit → import
-  goes through the same validation path either way).
-- `apps/web/app/api/components/export/route.ts` (new): `GET`, role-gated, streams
-  every component (available or not) as `Papa.unparse`'d CSV with
-  `Content-Disposition: attachment`.
-- `apps/web/app/api/components/import/route.ts` (new): `POST`, role-gated, reads a
-  `multipart/form-data` `file` field, `Papa.parse`s it, upserts by SKU (existing →
-  `update`, re-validating `specifications` and recomputing hot fields; new →
-  `create` + `Inventory` row). Deliberately NOT one all-or-nothing transaction —
-  each row is processed independently and a bad one is collected into a `failed`
-  array (`{ row, sku?, error }`, 1-indexed counting the header as row 1) rather than
-  aborting the whole file.
-- `apps/web/app/admin/import-export/page.tsx` + `import-export-panel.tsx` (new):
-  an "Export CSV" download link (plain `<a href>` to the API route — deliberately
-  NOT `next/link`, since it triggers a file download rather than a page
-  navigation; added an eslint-disable comment explaining why, to stop the
-  `@next/next/no-html-link-for-pages` rule) and a file-input "Import" flow showing
-  a created/updated/failed summary. Linked from `/admin`'s nav row.
-- Added `papaparse` + `@types/papaparse` to `apps/web`.
+- `apps/web/lib/storage.ts`: added `ALLOWED_MODEL_CONTENT_TYPES` (`model/gltf-binary`,
+  `model/gltf+json`, `application/octet-stream` — the last one because browsers
+  almost never report a real MIME type for `.glb`) and `MAX_MODEL_UPLOAD_BYTES`
+  (50MB, vs. 10MB for images). `buildAssetKey()` now takes a `prefix` param
+  (`"components"` default, `"models"` for 3D assets) so uploaded models land under
+  a `models/` key prefix instead of mixed in with images.
+- `apps/web/app/api/assets/route.ts`: generalized to accept an optional
+  `purpose: "image" | "model"` field (default `"image"`), selecting the matching
+  content-type allowlist and key prefix. Same route now serves both the Milestone
+  3 image-upload flow and this milestone's model-upload flow — no duplicate route.
+- `apps/web/lib/threeDAssets.ts` (new): `PROCEDURAL_GENERATORS` — the 10 generator
+  names ARCHITECTURE.md §7.3 documents (`createGenericCPU`, `createGenericGPU`,
+  etc.) — and `DEFAULT_GENERATOR_BY_CATEGORY` (a suggested default per category
+  key, not enforced). None of these functions exist yet
+  (`packages/three-d-engine` is an empty stub until Phase 4) — recording which
+  generator a component should use is a data decision the admin can make now,
+  same pattern as categories existing before their Zod schema does.
+- `apps/web/app/api/components/[id]/asset/route.ts` (new): `PUT`, role-gated. Zod
+  schema with `.refine()` cross-field checks: `url` required when `kind ===
+  "GLTF_MODEL"`, `proceduralGeneratorKey` required when `kind ===
+  "PROCEDURAL_FALLBACK"`. Upserts — finds the component's existing `ThreeDAsset`
+  (by `componentId`, taking the first if one exists) and updates it, or creates
+  one if none exists. Full `PUT` replace semantics: fields not in the body are
+  cleared (set to `null`), not left alone — confirmed this is what actually
+  happened when testing (switching kinds without re-sending license/attribution
+  cleared them, which is correct for `PUT`, not a bug).
+- `apps/web/app/admin/components/[id]/asset/page.tsx` + `asset-form.tsx` (new):
+  server component fetches the component + its existing `threeDAssets[0]`; client
+  form lets the admin pick `kind` (select), and conditionally shows either a
+  generator dropdown (`PROCEDURAL_FALLBACK`) or a file input wired to the same
+  upload-then-PUT flow as component images, just with `purpose: "model"` and
+  `.glb`/`.gltf` accept filter (`GLTF_MODEL`). Common fields:
+  source/licenseInfo/attribution/usageRights.
+- `apps/web/app/admin/page.tsx`: added a "3D Asset" link next to Edit/Delete in
+  every dashboard table row.
 
-**Verification — and what it surfaced:**
-- Live-tested export → download → hand-edit (via a throwaway Node script, not
-  PowerShell — PowerShell 5.1's string handling on Windows kept mangling the CSV
-  content across multiple attempts, so a Node script doing the whole
-  login→export→append→import round trip in one process was more reliable) → adding
-  one new valid row (a Monitor... actually SSD row) and one deliberately-broken row
-  (bad category key) → re-import.
-- **Debugging detour, root-caused and fixed in the TEST SCRIPT (not the app):** the
-  first re-import attempt failed with cryptic PapaParse "Trailing quote malformed"
-  errors. Root cause: `Papa.unparse` defaults to CRLF (`\r\n`) line endings, but my
-  test script appended new rows with plain `\n` — the resulting mixed-line-ending
-  file confused PapaParse's tokenizer in a way that looked like a data corruption
-  bug but wasn't. Fixed by matching CRLF in the appended test rows. Worth
-  remembering: a hand-built CSV for testing needs consistent line endings matching
-  whatever produced the rest of the file.
-- **After fixing the test script, the SAME re-import attempt failed again — this
-  time for a real reason:** 6 of the 7 real seeded components failed
-  `validateSpecifications` with errors like `"socket": "expected string, received
-  undefined"`. This is a genuine pre-existing bug, not caused by this session's
-  CSV work — `packages/database/prisma/seed.ts` (written in Phase 1, Milestone 2,
-  before `@pcbuilder/component-models` existed) had set hot-column values
-  (`socket`, `tdpWatts`, `formFactor`, `ramType`, `pcieGeneration`,
-  `lengthMm`/`widthMm`/`heightMm`, `wattage`) as separate literal Prisma fields
-  alongside a `specifications` object that, for CPU/GPU/Motherboard/PSU/RAM, never
-  included those same fields — contradicting ADR-002's own stated design (hot
-  columns are promoted *in addition to* full data in `specifications`, not instead
-  of it). Nothing had caught this before because nothing had re-validated the seed
-  data against the real schemas since they didn't exist yet when seed.ts was
-  written.
-- **Fixed at the root:** rewrote `seed.ts` so every component's `specifications`
-  object is the complete, schema-correct spec, then derives hot columns via the
-  SAME `validateSpecifications()`/`extractHotFields()` functions
-  `POST /api/components` uses — no more hand-duplicated literals. Added
-  `@pcbuilder/component-models` as a dependency of `@pcbuilder/database` for this.
-  **Also fixed the upsert itself**: the `update` branch was previously a no-op
-  `{}`, meaning even a corrected seed script would have silently failed to fix
-  already-seeded rows — changed it to mirror `create`, so re-running the seed
-  against a live database actually corrects drifted data. Ran `pnpm --filter
-  @pcbuilder/database run db:seed` against the live (already-seeded) database;
-  confirmed via direct SQL (`specifications->'socket'` now returns `"AM5"` etc.
-  where it previously didn't exist) and via a second CSV round-trip that all 7
-  real components — plus the throwaway new SSD row — now import cleanly (only the
-  deliberately-broken row still fails, as intended).
-- Cleaned up afterward: deleted the throwaway SSD test component and its Inventory
-  row, deleted the test user, removed the two ad hoc Node test scripts.
-- `pnpm typecheck` (9/9), `pnpm build` (6/6, `/api/components/export` and
-  `/api/components/import` listed), and `pnpm test` (component-models' 34 tests
-  still pass) all pass.
-
-**Unrelated documentation fix found and repaired this session:** while adding
-ADR-009 for the seed-data bug, discovered `project-management/DECISIONS.md` was
-already corrupted from an earlier session — ADR-007's heading ("## ADR-007:
-next-auth v4...") had been lost, with its body text instead merged onto the tail
-end of ADR-008's last paragraph (readable as "...frequent part of the dev
-loop.: next-auth v4 (not v5), and no Prisma adapter..."), and the whole ADR-007
-section ended up positioned AFTER ADR-008 instead of before it. The actual ADR-007
-content was intact and correct, just missing its heading and misplaced. Rewrote the
-whole file with ADR-007 restored to its proper heading/position between ADR-006 and
-ADR-008, then appended ADR-009. Worth a quick skim of DECISIONS.md next session to
-confirm nothing else looks off, since this wasn't caught for at least 2-3 sessions.
+**Verification — live API test first, then a real GLB-shaped upload, then a
+Playwright UI pass:**
+- Registered + promoted a test admin, found an existing component (Intel CPU) with
+  its seeded `PROCEDURAL_FALLBACK` asset already in place.
+- Requested a model upload URL (`purpose: "model"`), PUT 8 real bytes (a fake
+  `glTF` magic-number header) to it — 200. Confirmed the object is publicly
+  readable afterward (200, exactly 8 bytes back).
+- `PUT` the component's asset to `kind: "GLTF_MODEL"` with that URL plus
+  source/licenseInfo/attribution/usageRights — 200, response reflects everything
+  correctly, and critically the returned `id` was the SAME as the pre-existing
+  seeded asset's id (`seed-asset-CPU-INTEL-13600K`) — confirming upsert, not a
+  duplicate row.
+- Confirmed validation: `PUT` with `kind: "GLTF_MODEL"` and no `url` → 400.
+- Switched back to `kind: "PROCEDURAL_FALLBACK"` with `proceduralGeneratorKey:
+  "createGenericCPU"` — 200, and confirmed via `GET /api/components/:id` that
+  exactly ONE `ThreeDAsset` row still exists for the component (not two) — the
+  same row had been updated twice, not duplicated.
+- Playwright: logged in, navigated to a component's asset page via the new "3D
+  Asset" dashboard link, confirmed the initial state shows `PROCEDURAL_FALLBACK`
+  with the generator dropdown visible, switched the kind selector to
+  `GLTF_MODEL` and confirmed the generator dropdown disappears and the file
+  input appears — screenshotted both states.
+- Cleaned up: reverted the test CPU's asset back to its exact original seeded
+  state (already matched after the PROCEDURAL_FALLBACK switch — no extra revert
+  needed), deleted the test admin user, removed the two throwaway Node/Playwright
+  scripts.
+- **SeaweedFS environment note for future sessions:** hit two real gotchas
+  restarting it this session (documented in `docs/DEVELOPMENT.md`'s
+  troubleshooting section): (1) starting it via `Start-Process -ArgumentList`
+  with the `-s3.config` path as a separate unquoted array element truncates the
+  path at the first space (this machine's profile path has one — `Jassim
+  Shaji`) — fix is one array element with embedded literal quotes around the
+  path; (2) after that failure the process got stuck in an endless raft
+  leader-election retry loop even once restarted correctly, because its
+  persisted single-node state in `-dir` referenced a different self-discovered
+  IP than the one it was being started with — fix was wiping the data directory
+  (safe, it's just local dev object storage) and restarting fresh.
+- `pnpm typecheck` (9/9), `pnpm --filter web run lint` (clean), and `pnpm build`
+  (6/6, 22 routes total including the two new ones) all pass.
 
 FILES CREATED:
-- apps/web/lib/csv.ts
-- apps/web/app/api/components/export/route.ts
-- apps/web/app/api/components/import/route.ts
-- apps/web/app/admin/import-export/page.tsx, import-export-panel.tsx
+- apps/web/lib/threeDAssets.ts
+- apps/web/app/api/components/[id]/asset/route.ts
+- apps/web/app/admin/components/[id]/asset/page.tsx, asset-form.tsx
 
 FILES MODIFIED:
-- apps/web/app/admin/page.tsx (Import/Export nav link)
-- apps/web/package.json (papaparse, @types/papaparse)
-- packages/database/package.json (added @pcbuilder/component-models dependency)
-- packages/database/prisma/seed.ts (specifications as single source of truth, hot
-  columns derived via extractHotFields, update branch mirrors create)
-- docs/API.md (documented the two new routes), docs/DATABASE.md (seed data section
-  rewritten to explain the derive-don't-duplicate pattern and why),
-  project-management/DECISIONS.md (repaired ADR-007, added ADR-009),
-  project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
-  project-management/CURRENT_PHASE.md, project-management/PROJECT_STATUS.md,
-  project-management/CHANGELOG.md (this checkpoint's sibling docs)
+- apps/web/lib/storage.ts (model content types/size limit, prefix-aware buildAssetKey)
+- apps/web/app/api/assets/route.ts (purpose: "image" | "model")
+- apps/web/app/admin/page.tsx ("3D Asset" link)
+- docs/API.md (documented PUT /api/components/:id/asset, updated POST /api/assets'
+  doc for the purpose field — removed the now-stale duplicate section from
+  Milestone 3), docs/DEVELOPMENT.md (SeaweedFS troubleshooting notes for the two
+  gotchas above), project-management/DEVELOPMENT_ROADMAP.md,
+  project-management/TODO.md, project-management/CURRENT_PHASE.md,
+  project-management/PROJECT_STATUS.md, project-management/CHANGELOG.md (this
+  checkpoint's sibling docs)
 
-DATABASE CHANGES: `specifications` corrected (in place, via re-running the seed —
-not a migration) for CPU-AMD-7800X3D, CPU-INTEL-13600K, MB-ASUS-B650A,
-GPU-NVIDIA-RTX4070, RAM-CORSAIR-VENGEANCE-32GB-DDR5, PSU-SEASONIC-FOCUS-850 (6 of
-the 7 seeded components — CASE-NZXT-H510 was already correct). No schema/migration
-changes.
+DATABASE CHANGES: none to the schema. (One component's `ThreeDAsset` was
+temporarily switched to `GLTF_MODEL` and back to its original
+`PROCEDURAL_FALLBACK` state during testing — ended up byte-for-byte identical to
+where it started.)
 
-API CHANGES: `GET /api/components/export`, `POST /api/components/import` — both new.
+API CHANGES: `PUT /api/components/:id/asset` (new); `POST /api/assets` extended
+(backward compatible — `purpose` defaults to `"image"`, so existing image-upload
+callers are unaffected).
 
-FRONTEND CHANGES: `/admin/import-export` (new page).
+FRONTEND CHANGES: `/admin/components/:id/asset` (new page); dashboard tables gained
+a "3D Asset" action link.
 
-3D ENGINE CHANGES: none — packages/three-d-engine is still an empty stub.
+3D ENGINE CHANGES: none — `packages/three-d-engine` is still an empty stub. (The
+generator names now recorded per component are forward references to functions
+that land in Phase 4.)
 
 KNOWN ISSUES: none new. (Carried over, unchanged: orphaned storage objects on
 component delete; the cosmetic Turbopack `export *` build warning.)
 
-TEST STATUS: no new automated tests this session — this milestone's correctness
-(including the seed-data bug) was found and confirmed via live export/import round
-trips against the real server and real database, which is exactly the kind of
-integration-level issue a unit test wouldn't have caught anyway (it was a data
-problem, not a logic problem). `packages/component-models`'s 34 tests still pass.
+TEST STATUS: no new automated tests this session — verified via live API calls, a
+real presigned-upload round trip, and a Playwright UI pass, which is the right
+verification method for this kind of upload/upsert wiring.
+`packages/component-models`'s 34 tests still pass.
+
+**PHASE 2 IS NOW COMPLETE.** All 6 milestones (component-models, admin inventory
+dashboard, admin CRUD + image upload, stock/brand/category management, CSV
+import/export, 3D asset manager) are done and verified.
 
 NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md +
 CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes and
-Postgres is running, then implement Phase 2, Milestone 6 (3D asset manager — the
-last Phase 2 milestone): an admin UI to upload a GLTF/GLB file per component (via
-the same presigned-URL pattern as image upload in `apps/web/lib/storage.ts`,
-extended to accept model MIME types / file extensions), assign/change a
-`ThreeDAsset`'s `kind` (`GLTF_MODEL`/`PROCEDURAL_FALLBACK`/`PLACEHOLDER`) and
-`proceduralGeneratorKey`, and record `source`/`licenseInfo`/`attribution`/
-`usageRights`. See ARCHITECTURE.md §7.3 for the asset-resolution design this feeds.
-After this milestone, Phase 2 is complete and Phase 3 (compatibility engine) is
-next — that'll be a good point to also do a broader sanity pass over
-project-management docs given the DECISIONS.md corruption found this session.
+Postgres is running, then start PHASE 3 (Compatibility Engine & Power Calculation),
+Milestone 1: `packages/compatibility-engine` scaffold — `CompatibilityResult`/
+`CompatibilityReport`/`Severity` types per ARCHITECTURE.md §6, and the
+`runCompatibilityCheck()` entry point shape, ahead of writing the actual rules
+(Milestone 2: CPU↔socket, RAM↔motherboard, GPU↔case clearance, case↔form factor,
+cooling↔socket/mount, storage interface) and the power calculator (Milestone 3).
+This phase explicitly requires full Vitest test coverage on every rule — not
+optional, per the project brief — so budget for writing real tests alongside the
+rules, not as an afterthought. Stop at the scaffold checkpoint rather than also
+writing the rules in the same session. Also worth a quick skim of the other
+project-management docs sometime soon, given the DECISIONS.md corruption found and
+fixed this session — confirm nothing else has quietly drifted.
 
 EXACT COMMANDS TO RUN THE PROJECT LOCALLY:
   pnpm install
   pnpm dev                     # apps/web on http://localhost:3000
 
-Try it: `/admin/import-export` — "Export CSV" downloads the current catalog;
-re-upload it (or a hand-edited copy) via the file input to see the import summary.
-
 One-time per machine / after a fresh clone (all already done on this machine):
   cp packages/database/.env.example packages/database/.env
   pnpm --filter @pcbuilder/database run db:migrate
   pnpm --filter @pcbuilder/database run db:seed
-  cp apps/web/.env.example apps/web/.env.local   # fill in DATABASE_URL + generate NEXTAUTH_SECRET; S3_* only needed for image upload
+  cp apps/web/.env.example apps/web/.env.local   # fill in DATABASE_URL + generate NEXTAUTH_SECRET; S3_* only needed for image/model upload
 
 Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 
 Local Postgres on THIS machine: native Windows service `postgresql-x64-17` on
 localhost:5432, superuser `postgres`/`postgres`, app role `pcbuilder`/`pcbuilder`
-owning database `pcbuilder`. SeaweedFS (image upload only) is NOT running — see
-docs/DEVELOPMENT.md to start it if Milestone 6 needs it.
+owning database `pcbuilder`. SeaweedFS is NOT running (stopped at end of session) —
+see docs/DEVELOPMENT.md (including its new troubleshooting notes) to restart it if
+a future session needs image/model upload to work; not needed for Phase 3.
 
 PATH note (still applies): if `node`/`pnpm`/`npm`/`psql` report "not recognized" in a
 fresh shell, prepend, e.g. in PowerShell:

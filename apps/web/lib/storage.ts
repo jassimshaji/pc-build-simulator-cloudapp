@@ -36,19 +36,30 @@ export const ALLOWED_IMAGE_CONTENT_TYPES = [
   "image/gif",
 ] as const;
 
+// .glb almost never gets a proper browser-reported MIME type (most browsers
+// report "application/octet-stream" for it, since model/gltf-binary isn't
+// universally registered) — allow both rather than rejecting real GLB
+// uploads on a technicality.
+export const ALLOWED_MODEL_CONTENT_TYPES = [
+  "model/gltf-binary",
+  "model/gltf+json",
+  "application/octet-stream",
+] as const;
+
 // Advisory only: presigned PUT URLs can't enforce a byte-size limit the way
 // a presigned POST policy could. Acceptable for now since uploads are
 // ADMIN/INVENTORY_MANAGER-only (a trusted-user boundary), not public — see
 // ARCHITECTURE.md §9. Revisit with presigned POST conditions if this ever
 // needs to hold up against untrusted uploaders.
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
+export const MAX_MODEL_UPLOAD_BYTES = 50 * 1024 * 1024; // 50MB — GLTF/GLB run larger than images
 
 function sanitizeFilename(filename: string): string {
   return filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
 }
 
-export function buildAssetKey(filename: string): string {
-  return `components/${randomUUID()}-${sanitizeFilename(filename)}`;
+export function buildAssetKey(filename: string, prefix: "components" | "models" = "components"): string {
+  return `${prefix}/${randomUUID()}-${sanitizeFilename(filename)}`;
 }
 
 export async function createUploadUrl(key: string, contentType: string): Promise<string> {

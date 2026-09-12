@@ -2,6 +2,27 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 2, Milestone 6: 3D asset manager (Phase 2 complete)
+- Added `PUT /api/components/:id/asset` (upserts a component's `ThreeDAsset`,
+  full `PUT` replace semantics, kind-conditional validation) and extended
+  `POST /api/assets` with a `purpose: "image" | "model"` field so it serves both
+  image and 3D-model uploads through one route.
+- Added `/admin/components/:id/asset`: switch a component between an uploaded
+  GLTF/GLB (via the same presigned-URL pattern as image upload), a named
+  procedural generator (the 10 names ARCHITECTURE.md §7.3 documents — none
+  implemented yet, packages/three-d-engine is Phase 4), or a placeholder; record
+  source/license/attribution/usage-rights notes.
+- Verified live: a real presigned model upload + public read-back, confirmed
+  switching kinds upserts the same row rather than creating duplicates, confirmed
+  kind-specific validation 400s correctly, confirmed the form's conditional
+  fields via Playwright.
+- Documented two SeaweedFS environment gotchas hit while restarting it this
+  session (a path-with-spaces quoting issue via `Start-Process`, and a raft
+  leader-election deadlock requiring a data-dir reset) in `docs/DEVELOPMENT.md`.
+- **Phase 2 (Component Inventory System) is now complete** — all 6 milestones
+  done. Phase 3 (Compatibility Engine & Power Calculation) is next, pending user
+  "Continue".
+
 ## 2026-09-12 — Phase 2, Milestone 5: CSV import/export
 - Added `GET /api/components/export` and `POST /api/components/import`
   (multipart, upserts by SKU, per-row error reporting rather than an

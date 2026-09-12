@@ -85,6 +85,24 @@ is a plain background process you start manually — there's no Windows service
 registration for it here. If image upload tests fail with a connection error, check
 whether `weed.exe` is actually running.
 
+**Troubleshooting — stuck in a raft leader-election loop:** if `weed.err.log` shows
+repeating `masterclient.go: ... failed to receive from 127.0.0.1:9333: rpc error:
+... Not current leader` and the S3 port never opens, the single-node cluster's
+persisted state in `-dir` (`C:\seaweedfs\data`) most likely references a different
+IP than the one it's currently being started with (e.g. it previously
+self-discovered the machine's LAN IP instead of `127.0.0.1`, or vice versa). Fix:
+stop `weed.exe`, delete the contents of `C:\seaweedfs\data`, and restart — it's a
+fresh local dev store, safe to reset (re-upload anything you need afterward).
+
+**Troubleshooting — `-s3.config` path with spaces (e.g. under `C:\Users\Some
+Name\...`):** when starting `weed.exe` via a script/API rather than typing the
+command directly in a terminal (e.g. PowerShell's `Start-Process -ArgumentList`),
+an unquoted path containing a space gets truncated at the space by `weed.exe`'s own
+flag parser, silently pointing it at the wrong (nonexistent) config file. Wrap the
+whole `-s3.config=...` argument in one string with embedded literal double quotes
+around the path, e.g. `'-s3.config="C:\Users\Some Name\...\s3-config.json"'` as a
+single array element — not `-s3.config=`, `"C:\Users\Some Name\..."` as two.
+
 ## Testing strategy
 
 - **Unit tests (Vitest):** `packages/component-models` — implemented (Phase 2,

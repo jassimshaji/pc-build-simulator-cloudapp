@@ -3,8 +3,9 @@
 Status: auth (Phase 1, Milestone 3), read-only component/category routes (Phase 1,
 Milestone 5), the inventory dashboard route (Phase 2, Milestone 2), admin CRUD +
 image upload (Phase 2, Milestone 3), stock/brand/category management (Phase 2,
-Milestone 4), and CSV import/export (Phase 2, Milestone 5) are all implemented;
-everything else is still design-stage. This document will be filled in with real
+Milestone 4), CSV import/export (Phase 2, Milestone 5), and the 3D asset manager
+(Phase 2, Milestone 6 — the last Phase 2 milestone) are all implemented; everything
+else is still design-stage. This document will be filled in with real
 request/response shapes as each remaining route is built.
 
 ## Conventions
@@ -77,16 +78,6 @@ existing category and hot columns are recomputed. `404` if the id doesn't exist.
 component is referenced by a saved build's `BuildComponent` row (foreign key
 constraint — no builds exist yet as of Phase 2, so this is currently unreachable in
 practice, but handled rather than surfacing a raw 500).
-
-### `POST /api/assets`
-`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ filename: string, contentType: string }`
-— `contentType` must be one of `image/png`, `image/jpeg`, `image/webp`, `image/gif`.
-Returns `{ uploadUrl, publicUrl, key }`: `uploadUrl` is a short-lived (5 min)
-presigned S3 PUT URL the client uploads the file bytes to directly (this route never
-sees the file itself — see ARCHITECTURE.md §9); `publicUrl` is what to store as the
-component's image URL once the upload succeeds. See `apps/web/lib/storage.ts` and
-`docs/DEVELOPMENT.md`'s object storage section for the local (SeaweedFS) vs.
-production (Cloudflare R2) setup — same code, different env vars.
 
 ### `GET /api/inventory`
 `ADMIN`/`INVENTORY_MANAGER` only (`401` if unauthenticated, `403` for a `USER`
@@ -161,6 +152,36 @@ reported rather than aborting the whole file. Returns
 CSV in a spreadsheet would see). `400` only if the CSV itself fails to parse at all
 (malformed quoting, etc.) — per-row data problems are reported in `failed`, not as
 an HTTP error.
+
+### `PUT /api/components/:id/asset`
+`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ kind: "GLTF_MODEL" | "PROCEDURAL_FALLBACK"
+| "PLACEHOLDER", url?, proceduralGeneratorKey?, source?, licenseInfo?, attribution?,
+usageRights? }`. `url` is required (and only stored) when `kind` is `GLTF_MODEL`;
+`proceduralGeneratorKey` is required (and only stored) when `kind` is
+`PROCEDURAL_FALLBACK` (`400` if the required field for the chosen `kind` is
+missing). Upserts the component's `ThreeDAsset` — full replace semantics (`PUT`,
+not `PATCH`): fields omitted from the body are cleared, not left alone. Only one
+managed asset "slot" per component for this admin UI (the schema allows several via
+`ThreeDAsset.componentId`, but nothing here creates a second one — the existing row
+for the component, if any, is always the one updated). `404` if the component
+doesn't exist. To actually get a `url` for `kind: "GLTF_MODEL"`, request an upload
+URL first via `POST /api/assets` with `purpose: "model"` (see below), PUT the file
+there, then pass the returned `publicUrl` here.
+
+### `POST /api/assets`
+`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ filename, contentType, purpose?: "image"
+| "model" }` (`purpose` defaults to `"image"`). `contentType` is checked against an
+allowlist for the given `purpose` — images: `image/png`, `image/jpeg`,
+`image/webp`, `image/gif`; models: `model/gltf-binary`, `model/gltf+json`,
+`application/octet-stream` (browsers almost never report a real MIME type for
+`.glb`, so `application/octet-stream` is accepted rather than rejecting real GLB
+uploads on a technicality) — `400` on an unsupported type. Returns `{ uploadUrl,
+publicUrl, key }`: `uploadUrl` is a short-lived (5 min) presigned S3 PUT URL the
+client uploads the file bytes to directly (this route never sees the file itself —
+see ARCHITECTURE.md §9); `publicUrl` is what to store (as a component's image URL,
+or as a `ThreeDAsset.url`) once the upload succeeds. See `apps/web/lib/storage.ts`
+and `docs/DEVELOPMENT.md`'s object storage section for the local (SeaweedFS) vs.
+production (Cloudflare R2) setup — same code, different env vars.
 
 ### Route protection
 - `apps/web/proxy.ts` (Next.js 16's renamed `middleware.ts` convention) gates

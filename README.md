@@ -74,8 +74,11 @@ component browsing/compatibility/3D land in later phases), and a real admin area
 inline stock-quantity editor) plus full CRUD for components through a dynamic
 per-category form (generated from `@pcbuilder/component-models`'s Zod schemas) with
 image upload to S3-compatible object storage, standalone brand/category
-management (`/admin/brands`, `/admin/categories`), and CSV import/export
-(`/admin/import-export`). `packages/database` has a real Prisma schema, migration, and seed
+management (`/admin/brands`, `/admin/categories`), CSV import/export
+(`/admin/import-export`), and a 3D asset manager
+(`/admin/components/:id/asset`) for assigning GLTF/GLB uploads or procedural
+fallback generators per component. **Phase 2 (Component Inventory System) is
+complete** — Phase 3 (compatibility engine) is next. `packages/database` has a real Prisma schema, migration, and seed
 data (see `docs/DATABASE.md`). `packages/compatibility-engine` and
 `packages/three-d-engine` are still empty stubs pending Phases 3-4. See
 `project-management/PROJECT_STATUS.md` for live status.

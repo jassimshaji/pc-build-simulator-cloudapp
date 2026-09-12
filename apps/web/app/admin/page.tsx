@@ -49,6 +49,9 @@ function ComponentTable({ rows, emptyMessage }: { rows: InventoryRow[]; emptyMes
                   <Link href={`/admin/components/${row.id}/edit`} className="text-zinc-300 hover:underline">
                     Edit
                   </Link>
+                  <Link href={`/admin/components/${row.id}/asset`} className="text-zinc-300 hover:underline">
+                    3D Asset
+                  </Link>
                   <DeleteComponentButton id={row.id} model={row.model} />
                 </div>
               </td>

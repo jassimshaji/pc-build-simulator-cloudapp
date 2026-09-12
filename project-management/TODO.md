@@ -28,7 +28,7 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] Admin CRUD for components (dynamic per-category spec form, image upload)
 - [COMPLETED] Stock management + brand/category management screens
 - [COMPLETED] CSV import/export
-- [TODO] 3D asset manager (upload GLTF/GLB, assign procedural fallback, license metadata)
+- [COMPLETED] 3D asset manager (upload GLTF/GLB, assign procedural fallback, license metadata)
 
 ## Phase 3 — Compatibility Engine & Power Calculation
 - [TODO] Engine scaffold + result/report types
