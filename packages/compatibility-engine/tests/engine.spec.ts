@@ -60,4 +60,14 @@ describe("runCompatibilityCheck", () => {
 
     expect(report.overallStatus).toBe("WARNING");
   });
+
+  it("wires real power estimation into the report (Milestone 3)", () => {
+    const cpu = component("CPU", { hotFields: { tdpWatts: 100 } });
+    const gpu = component("GPU", { hotFields: { powerDrawWatts: 200 } });
+
+    const report = runCompatibilityCheck(build(cpu, gpu));
+
+    expect(report.estimatedPowerWatts).toBe(300);
+    expect(report.recommendedPsuWattage).toBe(Math.ceil(300 * 1.25));
+  });
 });

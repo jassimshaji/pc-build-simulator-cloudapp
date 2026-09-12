@@ -162,7 +162,7 @@ Milestones (each independently shippable):
 1. `[x]` `packages/compatibility-engine` scaffold + `CompatibilityResult`/`Report` types.
 2. `[x]` Rules: CPU↔socket, RAM↔motherboard, GPU↔case clearance, case↔form factor,
    cooling↔socket/mount, storage interface availability.
-3. `[ ]` Power calculator + PSU wattage/connector check.
+3. `[x]` Power calculator + PSU wattage/connector check.
 4. `[ ]` `/api/compatibility/check` route + build creation flow (component picker,
    no 3D) that surfaces live compatibility/warnings and estimated power.
 5. `[ ]` Vitest coverage for every rule (the brief calls this out explicitly as

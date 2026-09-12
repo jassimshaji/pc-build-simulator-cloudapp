@@ -79,12 +79,12 @@ management (`/admin/brands`, `/admin/categories`), CSV import/export
 (`/admin/components/:id/asset`) for assigning GLTF/GLB uploads or procedural
 fallback generators per component. **Phase 2 (Component Inventory System) is
 complete.** `packages/database` has a real Prisma schema, migration, and seed
-data (see `docs/DATABASE.md`). `packages/compatibility-engine` now has 13 real
+data (see `docs/DATABASE.md`). `packages/compatibility-engine` now has 15 real
 compatibility rules (CPU↔socket, RAM↔motherboard, GPU↔case/motherboard,
 case↔motherboard form factor, cooling↔CPU/case, storage interface
-availability) running through `runCompatibilityCheck()` — power estimation is
-still Milestone 3. `packages/three-d-engine` is still an empty stub pending
-Phase 4. See `project-management/PROJECT_STATUS.md` for live status.
+availability, PSU wattage/connectors) plus a power calculator, all running
+through `runCompatibilityCheck()`. `packages/three-d-engine` is still an empty
+stub pending Phase 4. See `project-management/PROJECT_STATUS.md` for live status.
 
 Setup requires a local PostgreSQL server (`docs/DATABASE.md`), an
 `apps/web/.env.local` (`docs/DEVELOPMENT.md` has the exact steps, including

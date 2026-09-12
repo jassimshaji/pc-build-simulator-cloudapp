@@ -1,149 +1,127 @@
 SESSION DATE: 2026-09-12
 
-CURRENT PHASE: Phase 3, Milestone 2 COMPLETE. Next: Milestone 3 — power calculator.
+CURRENT PHASE: Phase 3, Milestone 3 COMPLETE. Next: Milestone 4 —
+`/api/compatibility/check` + build flow UI.
 
-CURRENT TASK: None in progress — awaiting user instruction for Phase 3, Milestone 3
-(`powerCalculator.ts` + the PSU wattage/connector check rule).
+CURRENT TASK: None in progress — awaiting user instruction for Phase 3, Milestone 4.
 
-LAST COMPLETED STEP: Phase 3, Milestone 2 (compatibility rules), verified via
-typecheck/test/build across the whole workspace.
+LAST COMPLETED STEP: Phase 3, Milestone 3 (power calculator + PSU checks),
+verified via typecheck/test/build across the whole workspace.
 
-Read every relevant category schema in `packages/component-models/src/categories/`
-(cpu, motherboard, gpu, ram, case, psu, airCooler, aioCooler, ssd, fan) to know
-exact field names before writing rules, and checked `packages/database/prisma/seed.ts`
-for real-world data shapes/conventions (e.g. `radiatorSupport` is free text like
-`"240mm front"`, not a clean enum — informed the AIO radiator-mount rule's
-substring-match approach and its `WARNING` severity instead of `ERROR`).
+Between the last dev session and this one, the user registered an account
+(`jassimshaji20@gmail.com`), asked for it to be promoted to `ADMIN` (done via a
+direct SQL `UPDATE` — a fresh login is required afterward since next-auth signs
+the role into a JWT at login time, not re-checked per request), and separately
+reported the Next.js dev tools indicator missing. That turned out to be
+shared, in-memory server state (`devIndicatorServerState.disabledUntil`, in
+`next/dist/server/dev/dev-indicator-server-state.js`) rather than a
+per-browser setting — someone had clicked "Hide" on the running dev server,
+setting a ~24h disable that's visible to every client hitting that server
+process. Restarting the dev server (`pnpm dev`) reset it; confirmed via a
+Playwright check of the actual HMR WebSocket frame
+(`"devIndicator":{"disabledUntil":0}`) and a screenshot showing the icon back
+in the bottom-right corner. None of this touched application code. A GitHub
+remote (`origin` → `pc-build-simulator-cloudapp`) was also added and a
+harmless merge pulled in a `LICENSE` file — no conflicts, nothing overwritten.
 
-- `packages/compatibility-engine/src/rules/utils.ts` (new): `componentsOf`,
-  `firstOf`, `sumBy` — shared helpers for reading a `CompatibilityCheckInput`,
-  internal to the package (not re-exported from `src/index.ts`).
-- `packages/compatibility-engine/src/rules/cpuSocket.ts` (new): `checkCpuSocket` —
-  CPU.socket === Motherboard.socket, `ERROR` on mismatch.
-- `packages/compatibility-engine/src/rules/ramCompatibility.ts` (new): three
-  independent checks (deliberately split into three `CompatibilityResult`s rather
-  than one combined result, so one mismatch doesn't hide the others) —
-  `checkRamTypeMatch`, `checkRamCapacity` (sums `memoryCapacityGb * quantity`
-  across all installed RAM against `motherboard.maxRamGb`), `checkRamModuleCount`
-  (sums `numberOfModules * quantity` against `motherboard.ramSlots`). All `ERROR`
-  on violation.
-- `packages/compatibility-engine/src/rules/gpuClearance.ts` (new):
-  `checkGpuLengthClearance` (`gpu.lengthMm <= case.maxGpuLengthMm`, `ERROR`) and
-  `checkGpuSlotWidth` (`gpu.slotWidth <= motherboard.pcieSlots`, `WARNING` — the
-  schema has no expansion-slot-spacing field, so this is a coarse proxy, not a
-  hard physical measurement).
-- `packages/compatibility-engine/src/rules/caseFormFactor.ts` (new):
-  `checkCaseFormFactor` — reads the full
-  `case.specifications.supportedMotherboardFormFactors` array (not the case's
-  `formFactor` hot column, which only holds the primary/largest supported size
-  for catalog filtering — see component-models' `extractCaseHotFields` comment).
-  `ERROR` if the motherboard's form factor isn't in that array.
-- `packages/compatibility-engine/src/rules/coolingCompatibility.ts` (new): four
-  checks, split by cooler type since air and AIO coolers have different physical
-  constraints — `checkAirCoolerSocketSupport`/`checkAioCoolerSocketSupport`
-  (`cooler.socketCompatibility.includes(cpu.socket)`, `ERROR`),
-  `checkAirCoolerClearance` (`cooler.heightMm <= case.maxCpuCoolerHeightMm`,
-  `ERROR`), `checkAioRadiatorMountSupport` (substring match against
-  `case.radiatorSupport`'s free-text entries, `WARNING` — see note above on why
-  this is soft rather than hard).
-- `packages/compatibility-engine/src/rules/storageInterface.ts` (new):
-  `checkM2SlotAvailability` (M.2 NVMe + M.2 SATA drives share one pool, checked
-  against `motherboard.m2Slots`) and `checkSataPortAvailability` (2.5" SATA
-  drives against `motherboard.sataPorts`). Both `ERROR` on violation, both
-  `null` when no drives of that interface type are present (so an all-NVMe
-  build doesn't get an irrelevant SATA-port result).
-- `packages/compatibility-engine/src/rules/index.ts` (new): `ALL_RULES` — all 13
-  rule functions in one array, the only place `engine.ts` needs to change as
-  rules are added.
-- `packages/compatibility-engine/src/engine.ts`: `RULES` now imports `ALL_RULES`
-  instead of being hardcoded empty.
-- Test files (new, one per rule module, in
-  `packages/compatibility-engine/tests/`): `cpuSocket.spec.ts` (4 tests),
-  `ramCompatibility.spec.ts` (11), `gpuClearance.spec.ts` (7),
-  `caseFormFactor.spec.ts` (4), `coolingCompatibility.spec.ts` (12),
-  `storageInterface.spec.ts` (7) — 45 tests, each covering the compatible case,
-  the incompatible case, and at least one "rule doesn't apply yet" (`null`)
-  case. Plus `tests/helpers.ts` (a `component()`/`build()` builder to cut
-  boilerplate) and a rewritten `tests/engine.spec.ts` (5 tests, was 2) that now
-  also verifies `overallStatus` aggregation end-to-end (OK when all applicable
-  rules pass, ERROR when any is an incompatible ERROR, WARNING when the worst is
-  an incompatible WARNING) — 50 new tests total this milestone.
+- `packages/compatibility-engine/src/powerCalculator.ts` (new):
+  `estimateSystemPower(build)` sums real per-component power data where the
+  schema has it (CPU `tdpWatts`, GPU `powerDrawWatts`, both from hot fields)
+  and falls back to small, explicitly-documented estimate constants for
+  everything else that has no power field in its Zod schema: a flat
+  motherboard baseline (30W), a per-RAM-module estimate (5W, using
+  `numberOfModules` from specifications when present), a per-SSD estimate
+  (6W), a per-fan fallback (3W, only used when a fan's own
+  `powerConsumptionWatts` spec is missing — real fan data is used when
+  present), and a per-AIO-pump estimate (5W). All estimates multiply by each
+  component's `quantity`. `calculateRecommendedPsuWattage(estimatedPowerWatts,
+  headroomMultiplier = 1.25)` applies the headroom multiplier from
+  ARCHITECTURE.md §6 and rounds up.
+- `packages/compatibility-engine/src/engine.ts`: `runCompatibilityCheck()` now
+  calls both power functions and returns real `estimatedPowerWatts`/
+  `recommendedPsuWattage` instead of hardcoded `0`s.
+- `packages/compatibility-engine/src/rules/psuPower.ts` (new): `checkPsuWattage`
+  (recomputes the recommended wattage and compares against
+  `psu.hotFields.wattage`, `ERROR` on shortfall — only runs once a PSU AND at
+  least one of CPU/GPU is present, so a partial build doesn't produce a
+  trivially-passing result) and `checkPsuConnectors` (deliberately simple/
+  advisory: checks the PSU has ≥1 CPU power connector when a motherboard is
+  present, and ≥ as many PCIe power connectors as installed GPUs — `WARNING`,
+  not `ERROR`, since the schema only describes GPU/motherboard connector
+  *type* as free text, never a count to actually verify against; documented
+  inline as a coarse proxy, matching the guidance carried over from last
+  session's checkpoint). Both registered in `rules/index.ts`'s `ALL_RULES`
+  (now 15 rules total).
+- New test files: `tests/powerCalculator.spec.ts` (14 tests covering every
+  category's contribution, the RAM-module-count fallback, the fan
+  real-vs-fallback distinction, a mixed-build sum, and the headroom
+  multiplier/rounding) and `tests/psuPower.spec.ts` (9 tests: both rules'
+  compatible/incompatible/not-applicable cases). `tests/engine.spec.ts` gained
+  one more test confirming the power numbers are now really wired through
+  end-to-end (was hardcoded 0 through Milestone 1-2).
 
 **Verification:**
 - `pnpm --filter @pcbuilder/compatibility-engine run typecheck` — exit 0.
-- `pnpm --filter @pcbuilder/compatibility-engine run test` — 50/50 passing.
+- `pnpm --filter @pcbuilder/compatibility-engine run test` — 74/74 passing.
 - `pnpm typecheck` (whole workspace) — 9/9 tasks pass.
-- `pnpm build` (whole workspace) — 6/6 tasks pass, only the pre-existing cosmetic
-  Turbopack `@prisma/client` `export *` warning (unchanged, not new).
-- `pnpm test` (whole workspace) — 84/84 tests pass (34 component-models + 50
+- `pnpm build` (whole workspace) — 6/6 tasks pass, only the pre-existing
+  cosmetic Turbopack `@prisma/client` `export *` warning (unchanged, not new).
+- `pnpm test` (whole workspace) — 108/108 tests pass (34 component-models + 74
   compatibility-engine).
 - `pnpm --filter web run lint` — clean, exit 0.
 
 FILES CREATED:
-- packages/compatibility-engine/src/rules/utils.ts
-- packages/compatibility-engine/src/rules/cpuSocket.ts
-- packages/compatibility-engine/src/rules/ramCompatibility.ts
-- packages/compatibility-engine/src/rules/gpuClearance.ts
-- packages/compatibility-engine/src/rules/caseFormFactor.ts
-- packages/compatibility-engine/src/rules/coolingCompatibility.ts
-- packages/compatibility-engine/src/rules/storageInterface.ts
-- packages/compatibility-engine/src/rules/index.ts
-- packages/compatibility-engine/tests/helpers.ts
-- packages/compatibility-engine/tests/cpuSocket.spec.ts
-- packages/compatibility-engine/tests/ramCompatibility.spec.ts
-- packages/compatibility-engine/tests/gpuClearance.spec.ts
-- packages/compatibility-engine/tests/caseFormFactor.spec.ts
-- packages/compatibility-engine/tests/coolingCompatibility.spec.ts
-- packages/compatibility-engine/tests/storageInterface.spec.ts
+- packages/compatibility-engine/src/powerCalculator.ts
+- packages/compatibility-engine/src/rules/psuPower.ts
+- packages/compatibility-engine/tests/powerCalculator.spec.ts
+- packages/compatibility-engine/tests/psuPower.spec.ts
 
 FILES MODIFIED:
-- packages/compatibility-engine/src/engine.ts (RULES now imports ALL_RULES)
-- packages/compatibility-engine/tests/engine.spec.ts (rewritten: 5 tests incl.
-  aggregation coverage, was 2)
+- packages/compatibility-engine/src/engine.ts (real power fields, not hardcoded 0)
+- packages/compatibility-engine/src/rules/index.ts (registered the 2 new psuPower rules)
+- packages/compatibility-engine/tests/engine.spec.ts (+1 test for power wiring)
 - project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
   project-management/PROJECT_STATUS.md, project-management/CURRENT_PHASE.md,
   project-management/CHANGELOG.md (this checkpoint's sibling docs)
 
-DATABASE CHANGES: none.
+DATABASE CHANGES: none from development work. (Out-of-band: `User.role` for
+`jassimshaji20@gmail.com` was updated to `ADMIN` via a direct SQL statement,
+per the user's request — not a migration, a one-off data change.)
 
 API CHANGES: none — `/api/compatibility/check` is Milestone 4.
 
-FRONTEND CHANGES: none — the text-only build flow UI is Milestone 4.
+FRONTEND CHANGES: none — the build flow UI is Milestone 4.
 
-COMPATIBILITY ENGINE CHANGES: 13 real rules now run on every
-`runCompatibilityCheck()` call, covering CPU↔socket, RAM↔motherboard (3 checks),
-GPU↔case/motherboard (2 checks), case↔motherboard form factor, cooling↔CPU/case
-(4 checks), and storage↔motherboard interface (2 checks). Power fields
-(`estimatedPowerWatts`/`recommendedPsuWattage`) are still hardcoded `0` — that's
-Milestone 3, not a bug.
+COMPATIBILITY ENGINE CHANGES: `runCompatibilityCheck()` now returns real,
+non-zero `estimatedPowerWatts`/`recommendedPsuWattage`, and 2 new PSU rules run
+alongside the 13 from Milestone 2 (15 total).
 
 KNOWN ISSUES: none new. (Carried over, unchanged: orphaned storage objects on
 component delete; the cosmetic Turbopack `export *` build warning.)
 
-TEST STATUS: 84/84 passing workspace-wide (34 component-models + 50
-compatibility-engine, up from 2 last session).
+TEST STATUS: 108/108 passing workspace-wide (34 component-models + 74
+compatibility-engine, up from 84 last session).
 
-NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md +
-CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes and
-Postgres is running, then start PHASE 3, MILESTONE 3 — power calculator. Create
-`packages/compatibility-engine/src/powerCalculator.ts` with
-`estimateSystemPower(build: CompatibilityCheckInput): number`, summing CPU
-`tdpWatts`, GPU `powerDrawWatts`, a motherboard baseline draw constant, per-stick
-RAM draw (RAM doesn't have a power hot field yet — decide a small constant per
-module, e.g. ~5W, documented as an estimate), per-drive storage draw (similarly
-no SSD power field — small constant per drive), and fan/AIO pump draw (FAN's
-`powerConsumptionWatts` spec field exists; AIO doesn't have one — use a constant
-per AIO). Apply a configurable headroom multiplier (default `1.25`, per
-ARCHITECTURE.md §6) to get `recommendedPsuWattage`. Wire both numbers into
-`engine.ts`'s `runCompatibilityCheck()` return value (replacing the hardcoded
-`0`s). Then add `rules/psuPower.ts`: `estimatedPowerWatts * headroom <=
-psu.wattage`, plus a connector count sanity check (CPU power connectors, PCIe
-power connectors vs. what's implied by installed components — keep this part
-simple/advisory since the schema doesn't track per-component connector
-*requirements*, only the PSU's supply counts). Register the new rule in
-`rules/index.ts`. Full Vitest coverage for the calculator and the new rule, same
-standard as Milestone 2. Stop at this milestone's checkpoint rather than also
-starting Milestone 4 in the same session.
+NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md
++ CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes
+and Postgres is running, then start PHASE 3, MILESTONE 4 —
+`/api/compatibility/check` + build flow UI. This is the first milestone that
+touches `apps/web`, so it needs to bridge real Prisma `Component` rows into the
+engine's plain `BuildComponentInput` shape: `categoryId` → `categoryKey` (via
+the `ComponentCategory` relation), the hot columns (`socket`, `formFactor`,
+etc. — already on the `Component` row) → `hotFields`, and `specifications`
+passed straight through. Design the request/response shape for the route (e.g.
+`POST /api/compatibility/check` with a list of `{ componentId, quantity }`
+pairs, looking up each `Component` + its category, then calling
+`runCompatibilityCheck`). Then a simple text-only build page: a way to pick one
+component per category (or multiple for RAM/fans/storage), see the live
+`CompatibilityReport` (results list with severity, overall status,
+estimated/recommended power) update as selections change — no 3D placement
+yet, that's Phase 4. Consider whether this needs a `PCBuild`/`BuildComponent`
+row at all yet, or can work purely client-side against the check endpoint
+first (simpler, defers persistence to Phase 5) — use judgment, but lean toward
+the simpler option since Phase 5 owns save/load. Stop at this milestone's
+checkpoint rather than also starting Milestone 5 in the same session.
 
 EXACT COMMANDS TO RUN THE PROJECT LOCALLY:
   pnpm install
@@ -161,7 +139,15 @@ Local Postgres on THIS machine: native Windows service `postgresql-x64-17` on
 localhost:5432, superuser `postgres`/`postgres`, app role `pcbuilder`/`pcbuilder`
 owning database `pcbuilder`. Confirmed running this session. SeaweedFS is NOT
 running (not needed for Phase 3) — see docs/DEVELOPMENT.md (including its
-troubleshooting notes) to restart it if a future session needs image/model upload.
+troubleshooting notes) to restart it if a future session needs image/model
+upload. The dev server was left running this session (started fresh, dev
+indicator confirmed enabled) — a future session can reuse it or restart it
+freely.
+
+A GitHub remote now exists: `origin` →
+https://github.com/jassimshaji/pc-build-simulator-cloudapp.git. Nothing has
+been pushed there by me — only a merge pulling its `LICENSE` file in. Don't
+assume push/PR workflows are set up without checking with the user first.
 
 PATH note (still applies): if `node`/`pnpm`/`npm`/`psql` report "not recognized" in a
 fresh shell, prepend, e.g. in PowerShell:

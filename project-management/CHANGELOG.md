@@ -2,6 +2,30 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 3, Milestone 3: power calculator + PSU checks
+- `packages/compatibility-engine/src/powerCalculator.ts`: `estimateSystemPower(build)`
+  sums real CPU `tdpWatts`/GPU `powerDrawWatts` and falls back to small,
+  documented estimate constants for categories with no power field in their
+  schema (motherboard baseline 30W, ~5W/RAM module, ~6W/SSD, ~3W/fan fallback
+  when a fan's own `powerConsumptionWatts` is missing, ~5W/AIO pump).
+  `calculateRecommendedPsuWattage()` applies the 1.25 default headroom
+  multiplier from ARCHITECTURE.md §6.
+- `engine.ts`'s `runCompatibilityCheck()` now returns real
+  `estimatedPowerWatts`/`recommendedPsuWattage` instead of hardcoded `0`s.
+- New `rules/psuPower.ts`: `checkPsuWattage` (recommended load vs. PSU
+  wattage, `ERROR`) and `checkPsuConnectors` (advisory count check — CPU
+  connector present, PCIe connectors ≥ GPU count — `WARNING`, since the
+  schema has no per-component connector *requirement* to check against, only
+  free-text connector *type* descriptions). 15 rules registered total.
+- 24 new Vitest tests (14 calculator + 9 rule + 1 engine wiring). 108/108
+  tests passing workspace-wide (up from 84).
+- Whole-workspace `pnpm typecheck` (9/9), `pnpm build` (6/6), `pnpm test`
+  (108/108), `pnpm --filter web run lint` (clean) all pass.
+- Out-of-band this session (not a milestone task): promoted
+  `jassimshaji20@gmail.com` to `ADMIN` per the user's request, and diagnosed a
+  "missing dev indicator" report to a shared dev-server-process in-memory
+  state (not a per-browser setting) — fixed by restarting the dev server.
+
 ## 2026-09-12 — Phase 3, Milestone 2: compatibility rules
 - 13 rule functions across 6 new files under
   `packages/compatibility-engine/src/rules/`: `cpuSocket` (1 rule),

@@ -33,7 +33,7 @@ of duplicates — update status in place rather than re-adding a task.
 ## Phase 3 — Compatibility Engine & Power Calculation
 - [COMPLETED] Engine scaffold + result/report types
 - [COMPLETED] Rules: CPU socket, RAM, GPU clearance, case form factor, cooling, storage interface
-- [TODO] Power calculator + PSU wattage/connector checks
+- [COMPLETED] Power calculator + PSU wattage/connector checks
 - [TODO] `/api/compatibility/check` + text-only build flow UI
 - [TODO] Vitest coverage for every compatibility rule (required, not optional)
 

@@ -1,8 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 3, Milestone 2 COMPLETE (compatibility rules) — next up is
-Milestone 3 (power calculator)
-**Overall completion:** ~55%
+**Current phase:** Phase 3, Milestone 3 COMPLETE (power calculator + PSU checks) —
+next up is Milestone 4 (`/api/compatibility/check` + build flow UI)
+**Overall completion:** ~58%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -44,17 +44,30 @@ Milestone 3 (power calculator)
   `rules/index.ts`'s `ALL_RULES`, consumed by `engine.ts`. 50 new Vitest tests
   (one file per rule module) plus 3 new integration tests in `engine.spec.ts`
   covering status aggregation (OK/WARNING/ERROR) end-to-end — 84 tests passing
-  workspace-wide. Power estimation is still Milestone 3 — reports still show 0
-  watts.
+  workspace-wide.
+- **Phase 3, Milestone 3 — power calculator + PSU checks:**
+  `powerCalculator.ts`'s `estimateSystemPower(build)` sums real CPU
+  `tdpWatts`/GPU `powerDrawWatts` plus small documented-estimate constants for
+  everything the schema doesn't carry real power data for (motherboard
+  baseline, per-RAM-module, per-SSD, per-fan fallback, per-AIO-pump).
+  `calculateRecommendedPsuWattage()` applies the default 1.25 headroom
+  multiplier. Both are now wired into `engine.ts` (`estimatedPowerWatts`/
+  `recommendedPsuWattage` are no longer hardcoded 0). Added `rules/psuPower.ts`:
+  `checkPsuWattage` (recommended load vs. PSU wattage, `ERROR`) and
+  `checkPsuConnectors` (a deliberately simple/advisory count check — CPU
+  connector present, PCIe connectors ≥ installed GPU count — `WARNING`, since
+  the schema only tracks connector *type* as free text on the GPU/motherboard
+  side, not a count to verify against). 24 new tests (14 calculator + 9 rule +
+  1 engine wiring test). **108 tests passing workspace-wide** (up from 84).
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 3, Milestone 3.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 3, Milestone 4.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 3: power calculator (Milestone 3),
-  `/api/compatibility/check` + build flow UI (Milestone 4), required Vitest
-  coverage on every rule (Milestone 5, already satisfied by Milestone 2's tests —
-  confirm nothing new needs coverage once Milestone 3's power calculator lands).
+- Phase 3: `/api/compatibility/check` + build flow UI (Milestone 4), required
+  Vitest coverage on every rule (Milestone 5 — already satisfied by Milestones
+  2-3's tests; this milestone is really just a final coverage confirmation
+  pass).
 - Phase 4: 3D workspace (R3F canvas, procedural generators, install zones, click-to-place).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
@@ -68,8 +81,8 @@ Milestone 3 (power calculator)
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 3, Milestone 3: power calculator** —
-`estimateSystemPower(build)` summing CPU/GPU/motherboard baseline/RAM/storage/fan
-draw, with a configurable headroom multiplier (default 1.25) producing
-`recommendedPsuWattage`, plus a PSU wattage/connector check rule. See
-`SESSION_CHECKPOINT.md` for exact resume details.
+Say "Continue" to begin **Phase 3, Milestone 4: `/api/compatibility/check` +
+build flow UI** — an API route wrapping `runCompatibilityCheck()`, and a
+text-only (no 3D yet) build creation flow that surfaces live
+compatibility/warnings and estimated power. See `SESSION_CHECKPOINT.md` for
+exact resume details.

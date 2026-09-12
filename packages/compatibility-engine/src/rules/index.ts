@@ -10,6 +10,7 @@ import {
   checkAioRadiatorMountSupport,
 } from "./coolingCompatibility";
 import { checkM2SlotAvailability, checkSataPortAvailability } from "./storageInterface";
+import { checkPsuWattage, checkPsuConnectors } from "./psuPower";
 
 // Every registered rule, in no particular order (engine.ts runs all of them
 // and each is independent). Add new rules here — this is the only place
@@ -28,4 +29,6 @@ export const ALL_RULES: CompatibilityRule[] = [
   checkAioRadiatorMountSupport,
   checkM2SlotAvailability,
   checkSataPortAvailability,
+  checkPsuWattage,
+  checkPsuConnectors,
 ];

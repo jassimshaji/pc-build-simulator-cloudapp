@@ -2,24 +2,26 @@
 
 **Phase 3 — Compatibility Engine & Power Calculation: IN PROGRESS**
 
-Milestone 1 (`packages/compatibility-engine` scaffold) and Milestone 2 (compatibility
-rules) are both done: 13 rule functions across 6 files under `src/rules/`
-(`cpuSocket`, `ramCompatibility`, `gpuClearance`, `caseFormFactor`,
-`coolingCompatibility`, `storageInterface`), all registered in `rules/index.ts` and
-run by `engine.ts`'s `runCompatibilityCheck()`. 50 rule-level Vitest tests + 3
-engine-level aggregation tests (84 tests passing workspace-wide).
+Milestones 1-3 are done:
+1. `packages/compatibility-engine` scaffold — `CompatibilityResult`/
+   `CompatibilityReport`/`CompatibilityRule` types, `runCompatibilityCheck()`.
+2. 13 compatibility rules across 6 files under `src/rules/` (CPU↔socket,
+   RAM↔motherboard, GPU↔case/motherboard, case↔form factor, cooling↔CPU/case,
+   storage interface).
+3. `src/powerCalculator.ts` (`estimateSystemPower`, `calculateRecommendedPsuWattage`
+   with a 1.25 default headroom multiplier) wired into `engine.ts`, plus
+   `src/rules/psuPower.ts` (PSU wattage check + an advisory connector-count
+   check). 108 tests passing workspace-wide.
 
-## Next up: Milestone 3 — Power calculator
-`powerCalculator.ts`: `estimateSystemPower(build)` summing `tdpWatts`/`powerDrawWatts`
-across installed CPU, GPU, motherboard baseline draw, per-stick RAM draw, per-drive
-storage draw, fan/AIO pump draw, then a configurable headroom multiplier (default
-`1.25`) to produce `recommendedPsuWattage`. Wire this into `engine.ts` so
-`CompatibilityReport.estimatedPowerWatts`/`recommendedPsuWattage` stop being
-hardcoded `0`. Also add the PSU wattage/connector check rule
-(`rules/psuPower.ts` — estimated power * headroom <= psu.wattage, connector count
-checks) now that the power estimate it depends on exists. Vitest coverage required
-for the calculator and the new rule, same as Milestone 2. See
-`DEVELOPMENT_ROADMAP.md` → Phase 3 for the full milestone list.
+## Next up: Milestone 4 — `/api/compatibility/check` + build flow UI
+An API route that accepts a set of component selections, builds a
+`CompatibilityCheckInput` from real `Component` rows (categoryKey, hot fields,
+specifications, quantity), calls `runCompatibilityCheck()`, and returns the
+`CompatibilityReport`. Then a text-only (no 3D — that's Phase 4) build creation
+flow: pick components per category, see live compatibility warnings/errors and
+the estimated power draw update as selections change. See
+`DEVELOPMENT_ROADMAP.md` → Phase 3 for the full milestone list; Milestone 5
+(confirming full Vitest coverage) follows.
 
 Waiting for explicit user instruction ("Continue" / "Resume development") before
-starting Milestone 3. See `SESSION_CHECKPOINT.md` for exact resume state.
+starting Milestone 4. See `SESSION_CHECKPOINT.md` for exact resume state.
