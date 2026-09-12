@@ -2,6 +2,22 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 2, Milestone 4: Stock management + brand/category management
+- Added `POST /api/inventory/update` (dedicated stock-quantity/threshold fast path)
+  and an inline stock editor on every admin dashboard table row.
+- Added full brand management (`/admin/brands`: list with component counts,
+  create, rename, delete-if-unused) and category management (`/admin/categories`:
+  same shape, plus label/sortOrder editing; `key` stays immutable since
+  component-models' registry keys off of it).
+- Verified live: brand and category create/rename-or-relabel/delete, including the
+  "cannot delete — N components still use this" 409 guard tested against real
+  in-use rows (the AMD brand, the CPU category), plus a Playwright pass
+  screenshotting both new pages and the dashboard's inline stock editor after a
+  save. Found and cleaned up a leftover test brand from Milestone 3's own testing
+  along the way.
+- Stopped at the Phase 2 / Milestone 4 checkpoint; CSV import/export (Milestone 5)
+  is next, pending user "Continue".
+
 ## 2026-09-12 — Phase 2, Milestone 3: Admin CRUD + image upload
 - Added `POST /api/components`, `PATCH /api/components/:id`,
   `DELETE /api/components/:id`, and `POST /api/assets` (presigned upload URL) —

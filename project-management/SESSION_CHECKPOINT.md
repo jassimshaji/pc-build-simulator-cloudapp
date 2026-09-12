@@ -1,229 +1,159 @@
 SESSION DATE: 2026-09-12
 
-CURRENT PHASE: Phase 2 — Component Inventory System (Milestone 3 of 6 complete)
+CURRENT PHASE: Phase 2 — Component Inventory System (Milestone 4 of 6 complete)
 
-CURRENT TASK: None in progress — awaiting user instruction for Milestone 4 (stock
-management + brand/category management).
+CURRENT TASK: None in progress — awaiting user instruction for Milestone 5 (CSV
+import/export).
 
-LAST COMPLETED STEP: Phase 2, Milestone 3 (admin CRUD + image upload), fully
-verified via a real browser session against the live dev server.
+LAST COMPLETED STEP: Phase 2, Milestone 4 (stock management + brand/category
+management), fully verified against the live dev server (API calls + a Playwright
+UI pass).
 
-**Object storage detour (read this before assuming R2/MinIO/anything is set up):**
-- No Cloudflare R2 bucket exists. Asked the user how to handle image storage for
-  this milestone; they asked for an open-source option. Attempted MinIO (the
-  obvious S3-compatible, Windows-binary, open-source choice) — discovered mid-session
-  that MinIO's community/open-source server has been discontinued (`dl.min.io`
-  returns a 410 Gone archival notice for all downloads; `winget install
-  MinIO.Server`/`MinIO.Client` both fail for the same reason). This is very recent
-  (2026) and not something knowable in advance.
-- Asked the user again; they chose **SeaweedFS** as the replacement (another
-  open-source, actively maintained, S3-compatible server). Downloaded
-  `windows_amd64.zip` from `github.com/seaweedfs/seaweedfs`'s latest release,
-  extracted `weed.exe` to `C:\seaweedfs\weed.exe` (outside the repo — no winget
-  package exists for it either, so it's a manual binary like the Postgres/Node
-  installs were).
-- Wrote `infrastructure/seaweedfs/s3-config.json` (checked into the repo — it's a
-  local-dev-only credential, same trust level as the Postgres pcbuilder/pcbuilder
-  password already documented in plaintext elsewhere): one `pcbuilder` read/write
-  identity, plus an `anonymous` read-only identity so uploaded images are viewable
-  via plain URLs without needing signed GET requests.
-- Started it with: `weed server -dir=C:\seaweedfs\data -s3 -s3.port=8333
-  -s3.config=<path>\infrastructure\seaweedfs\s3-config.json -s3.autoCreateBucket=true
-  -ip=127.0.0.1 -master.port=9333 -volume.port=8080 -filer.port=8888`.
-- Verified end-to-end with a throwaway Node script using `@aws-sdk/client-s3`
-  before writing any app code: created the `pc-builder-assets` bucket, put/got an
-  object, confirmed anonymous GET works (200) while anonymous PUT is still
-  rejected (403) — matching how a real R2 bucket configured for public read would
-  behave.
-- **Hit and fixed a real gotcha:** a presigned PUT URL (`getSignedUrl` from
-  `@aws-sdk/s3-request-presigner`) failed with `400 BadDigest` against SeaweedFS.
-  Root cause: newer `@aws-sdk/client-s3` versions default to embedding a checksum
-  (computed from the body at *signing* time, which is empty/unknown for a
-  not-yet-uploaded file) into the presigned URL's query string, which then can't
-  match whatever bytes the client actually PUTs later. Fixed by setting
-  `requestChecksumCalculation: "WHEN_REQUIRED"` on the `S3Client` constructor
-  (`apps/web/lib/storage.ts`). This is a general AWS SDK v3 gotcha, not
-  SeaweedFS-specific — would hit the same thing against real S3/R2.
-- All of this is written up as ADR-008 in `project-management/DECISIONS.md` and in
-  `docs/DEVELOPMENT.md`'s new "Object storage / image uploads" section (exact
-  install + per-session start commands), since a future session/machine will need
-  to redo the manual binary install (no automated way to detect "SeaweedFS isn't
-  running" other than image uploads failing to connect).
+- `apps/web/app/api/inventory/update/route.ts` (new): `POST`, role-gated, Zod
+  schema `{ componentId, stockQuantity?, lowStockThreshold? }`, upserts the
+  `Inventory` row (in practice always exists already — every component gets one on
+  creation in Milestone 3 — upsert is just defensive), stamps `lastRestockedAt =
+  new Date()` whenever `stockQuantity` is included. This is intentionally a
+  separate route from `PATCH /api/components/:id` (which edits the Component
+  itself) — a dedicated fast path for the routine "adjust stock" action.
+- `apps/web/app/admin/stock-cell.tsx` (new client component): replaces the plain
+  stock-quantity text in every dashboard `ComponentTable` row with a small number
+  input; a "Save" link only appears once the value actually differs from the
+  server value (`isDirty` check), calls the update route, then
+  `router.refresh()`.
+- `apps/web/app/api/brands/route.ts` (new): `GET` (public — every brand with
+  `_count.components`) and `POST` (role-gated, upserts nothing — this is an
+  explicit create, 409 on duplicate name; distinct from `POST /api/components`'s
+  implicit brand-upsert-by-name, which stays as-is for the common "type a new
+  brand while creating a component" flow).
+- `apps/web/app/api/brands/[id]/route.ts` (new): `PATCH` (rename/logoUrl, 409 on
+  duplicate name via Prisma's `P2002`, 404 via `P2025`) and `DELETE` (counts
+  referencing `Component` rows first, 409 with the count in the message if any
+  exist, never a bare foreign-key-violation 500).
+- `apps/web/app/api/components/categories/route.ts`: added `POST` (role-gated,
+  `{ key (regex-enforced UPPER_SNAKE_CASE), label, sortOrder }`, 409 on duplicate
+  key). Comment reiterates ARCHITECTURE.md §4.3: a new key with no matching
+  `@pcbuilder/component-models` schema just falls back to the generic permissive
+  schema — nothing else needs to change for the category to accept components.
+- `apps/web/app/api/components/categories/[id]/route.ts` (new): `PATCH`
+  (`{ label?, sortOrder? }` only — `key` is deliberately NOT patchable, since
+  component-models' registry and every existing `Component` row key off of it) and
+  `DELETE` (same in-use-count guard pattern as brands).
+- `apps/web/app/admin/brands/page.tsx` + `brand-form.tsx` (create) +
+  `brand-row-actions.tsx` (inline rename toggle, delete disabled with a
+  tooltip when `componentCount > 0`) — all new.
+- `apps/web/app/admin/categories/page.tsx` + `category-form.tsx` (create, key
+  auto-uppercased as typed) + `category-row-actions.tsx` (inline label/sortOrder
+  edit, delete disabled when in use) — all new.
+- `apps/web/app/admin/page.tsx`: added "Brands"/"Categories" nav links next to
+  "New component"; swapped the plain stock-quantity cell for `<StockCell>`;
+  updated the trailing "lands in a later milestone" note to point at CSV
+  import/export + 3D asset manager (Milestones 5-6) instead of this milestone's
+  now-done scope.
 
-**Application code:**
-- `apps/web/lib/storage.ts` (new): S3 client configured entirely from env vars
-  (`S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
-  `S3_BUCKET_NAME`, `S3_PUBLIC_URL`, `S3_FORCE_PATH_STYLE`) — swapping to real R2
-  in production is a config change, not a code change. Exports
-  `ALLOWED_IMAGE_CONTENT_TYPES`, `MAX_UPLOAD_BYTES` (advisory only — presigned PUT
-  can't enforce a byte limit the way presigned POST conditions could; acceptable
-  since uploads are admin-only, documented as a known limitation), `buildAssetKey`,
-  `createUploadUrl`, `getPublicAssetUrl`.
-- `apps/web/app/api/assets/route.ts` (new): `POST`, role-gated, Zod-validates
-  `{filename, contentType}` against the allowed image MIME types, returns
-  `{uploadUrl, publicUrl, key}`.
-- `apps/web/app/api/components/route.ts`: added `POST` (create) — validates the
-  shared fields itself, delegates `specifications` validation entirely to
-  `@pcbuilder/component-models`'s `validateSpecifications(categoryKey, ...)`,
-  derives hot columns via `extractHotFields`, upserts the brand by name, 409s on a
-  duplicate SKU, auto-creates a zero-stock `Inventory` row alongside the component.
-- `apps/web/app/api/components/[id]/route.ts`: added `PATCH` (partial update;
-  category/SKU immutable; re-validates + re-derives hot fields only if
-  `specifications` is included) and `DELETE` (catches Prisma's `P2003` foreign-key
-  violation as a friendly 409 rather than a raw 500 — currently unreachable since no
-  builds exist yet, but handled for when Phase 5 adds them).
-- `apps/web/lib/zod-form.ts` (new): the real engineering centerpiece of this
-  milestone. Introspects a Zod v4 object schema into a flat `FieldDescriptor[]`
-  (name/kind/required/enumOptions/defaultValue/children-for-nested-objects) and
-  converts submitted form values back into a plausible specifications object.
-  **Verified Zod v4's actual runtime shape empirically with throwaway scripts
-  before writing this** (v4 reworked its internals substantially vs. v3): every
-  schema exposes `.def.type` as a string discriminator ("string"/"number"/
-  "boolean"/"enum"/"array"/"object"/"optional"/"default"/...), and stable *public*
-  accessors `.unwrap()` (ZodOptional → inner), `.removeDefault()` (ZodDefault →
-  inner, with `.def.defaultValue` as a plain value not a function), `.element`
-  (ZodArray → element schema), `.shape` (ZodObject → field map), `.options`
-  (ZodEnum → string array) — used those public accessors rather than reaching
-  further into `.def` than necessary, for stability against future Zod patch
-  releases. Falls back to a plain string field for anything not explicitly
-  handled (unions, records like `driveBays`) — those fields are all optional in
-  every schema, so leaving them blank in the form still validates fine server-side.
-- `apps/web/app/admin/components/component-form.tsx` (new, client component): the
-  actual dynamic form. Category select (disabled in edit mode) drives
-  `describeSpecSchema(getSpecSchema(categoryKey))` via `useMemo`, re-rendering the
-  spec fields whenever category changes. Base fields (SKU/brand/model/price/
-  description/available/images) plus the dynamic spec fields, using **uncontrolled**
-  inputs read via `new FormData(form)` on submit (deliberate — avoids tracking
-  React state per dynamically-changing field, which would be significantly more
-  code for no real benefit here). Image upload: file input → `POST /api/assets` →
-  PUT the file to the returned `uploadUrl` → push `publicUrl` into local state, with
-  a remove button per uploaded image.
-- `apps/web/app/admin/components/new/page.tsx` and
-  `apps/web/app/admin/components/[id]/edit/page.tsx` (new server components):
-  fetch categories (and, for edit, the existing component) directly via Prisma,
-  render `<ComponentForm>`. Both re-check `requireRole` themselves (redirect to
-  `/login`), same belt-and-suspenders pattern as the existing `/admin` page.
-- `apps/web/app/admin/delete-component-button.tsx` (new client component):
-  `confirm()` + `DELETE /api/components/:id` + `router.refresh()`.
-- `apps/web/app/admin/page.tsx`: added a "New component" link and an Actions column
-  (Edit link + delete button) to every `ComponentTable` row.
-- Added `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, and
-  `@pcbuilder/component-models` (workspace) to `apps/web`'s dependencies.
-
-**Verification — a real Playwright browser session against the live dev server**
-(not API-only curl checks, because the actual risk area this milestone was the
-dynamic form's client-side behavior):
-- Registered + promoted a test admin (`crud-check@example.com`), logged in through
-  the real `/login` form.
-- Navigated to `/admin/components/new`, selected category "Monitor" (previously
-  zero components existed in this category), filled in SKU/brand/model/price and
-  every Monitor-specific field (screenSizeInches/resolution/refreshRateHz/
-  panelType/etc. — confirmed via a full-page screenshot that all fields render
-  correctly, matching `monitorSpecSchema` exactly), uploaded a real 1×1 PNG through
-  the actual presigned-URL flow, submitted, confirmed redirect to `/admin`.
-- Confirmed the new component appears via the dashboard's search (`?q=`).
-- Edited its price through `/admin/components/:id/edit`, confirmed the new price
-  persisted by re-opening the edit page and reading the input's value back
-  (279.99, not the original 299.99) — and confirmed the uploaded image URL was
-  still attached after the edit round-trip.
-- Deleted it via the dashboard's Delete button (handled the native `confirm()`
-  dialog), confirmed it no longer appears in search afterward.
-- **Debugging note for future sessions:** hit Next.js dev mode's classic "slow
-  first compile" — the very first Playwright run's `waitForSelector("#sku")`
-  timed out at 30s because `/admin/components/new` was compiling for the first
-  time; a second run against the same (still-running) dev server succeeded
-  instantly because the route was now warmed up server-side. Not a real bug —
-  documented here so nobody "fixes" a phantom timeout issue later.
+**Verification (live API calls first, then a Playwright browser pass for the UI
+pieces the API calls can't cover):**
+- Registered + promoted a test admin (`stock-check@example.com`).
+- Brands: created "TestBrandXYZ" via `POST /api/brands` → renamed to
+  "TestBrandRenamed" via `PATCH` → deleted it (0 components, succeeded, 200).
+  Then attempted `DELETE` on the real seeded "AMD" brand (1 component) → correctly
+  409'd.
+- Categories: created a real "HDD" / "Hard Drive" / sortOrder 200 category via
+  `POST` → relabeled it to "Hard Disk Drive" / sortOrder 205 via `PATCH` (confirmed
+  both fields changed) → deleted it (0 components, succeeded). Then attempted
+  `DELETE` on the real seeded "CPU" category (2 components) → correctly 409'd.
+- Inventory: set the Intel CPU's stock to 42 via `POST /api/inventory/update`,
+  confirmed via `GET /api/components/:id` that `inventory.stockQuantity` read back
+  as 42, then reverted to 25.
+- Playwright: logged in as the test admin, screenshotted `/admin/brands` (correct
+  Delete disabled/enabled states matching real component counts) and
+  `/admin/categories` (all 12 categories listed with correct counts — CPU showing
+  2, matching the two seeded CPUs), then on the dashboard used the inline
+  `StockCell` to set NZXT H510's stock to 77 and confirmed via a screenshot that
+  the saved value (77) persisted and the component now appeared at the top of
+  "Recently updated."
+- **Found and cleaned up a leftover from Milestone 3's own testing**: a
+  "TestBrand" row with 0 components, created implicitly by the Milestone 3
+  Playwright test's `brandName` field and never removed since deleting the test
+  Component doesn't cascade-delete the Brand it referenced. Deleted it this
+  session. (Worth remembering: brand/category rows created incidentally during
+  future test runs won't auto-clean themselves either — check for stragglers.)
+- Reverted the H510 stock change back to 25 and deleted the test admin user
+  afterward; confirmed via direct SQL that all 7 seeded components show
+  `stockQuantity = 25` again.
 - `pnpm typecheck` (9/9), `pnpm --filter web run lint` (clean), and `pnpm build`
-  (6/6, all new routes listed, one pre-existing cosmetic Turbopack warning about
-  `export * from "@prisma/client"` in `packages/database/src/index.ts` being CJS —
-  not new this session, not blocking, not fixed — could be addressed later by
-  listing explicit named exports instead of `export *`) all pass.
-- Cleaned up afterward: deleted the test admin user, stopped the dev server and
-  SeaweedFS process, removed all scratch scripts/screenshots/test images.
+  (6/6, all 18 routes listed, same pre-existing cosmetic `export *` Turbopack
+  warning as before — not new, not fixed, not blocking) all pass.
 
 FILES CREATED:
-- apps/web/lib/storage.ts, apps/web/lib/zod-form.ts
-- apps/web/app/api/assets/route.ts
-- apps/web/app/admin/components/component-form.tsx
-- apps/web/app/admin/components/new/page.tsx
-- apps/web/app/admin/components/[id]/edit/page.tsx
-- apps/web/app/admin/delete-component-button.tsx
-- infrastructure/seaweedfs/s3-config.json
+- apps/web/app/api/inventory/update/route.ts
+- apps/web/app/api/brands/route.ts, apps/web/app/api/brands/[id]/route.ts
+- apps/web/app/api/components/categories/[id]/route.ts
+- apps/web/app/admin/stock-cell.tsx
+- apps/web/app/admin/brands/page.tsx, brand-form.tsx, brand-row-actions.tsx
+- apps/web/app/admin/categories/page.tsx, category-form.tsx, category-row-actions.tsx
 
 FILES MODIFIED:
-- apps/web/app/api/components/route.ts (added POST), apps/web/app/api/components/[id]/route.ts
-  (added PATCH, DELETE), apps/web/app/admin/page.tsx (New component link, Actions column)
-- apps/web/package.json (added @aws-sdk/client-s3, @aws-sdk/s3-request-presigner,
-  @pcbuilder/component-models)
-- apps/web/.env.local, apps/web/.env.example, .env.example (root) — added S3_* vars
-- infrastructure/README.md, docs/API.md (documented the 3 new component-mutation
-  routes + /api/assets, trimmed the "planned" table), docs/DEVELOPMENT.md (real
-  object-storage setup section + corrected two stale paragraphs from earlier
-  milestones), project-management/DECISIONS.md (ADR-008),
+- apps/web/app/api/components/categories/route.ts (added POST)
+- apps/web/app/admin/page.tsx (nav links, StockCell wiring, updated footer note)
+- docs/API.md (documented the 5 new routes, trimmed the "planned" table),
   project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
   project-management/CURRENT_PHASE.md, project-management/PROJECT_STATUS.md,
   project-management/CHANGELOG.md (this checkpoint's sibling docs)
 
-DATABASE CHANGES: none to the schema. (One test component created/edited/deleted
-during verification, plus one test admin user — both cleaned up afterward.)
+DATABASE CHANGES: none to the schema. (Throwaway brand/category rows and a stock
+value change during testing, all reverted/deleted afterward.)
 
-API CHANGES: POST /api/components, PATCH /api/components/:id, DELETE
-/api/components/:id, POST /api/assets — all new, all role-gated.
+API CHANGES: `POST /api/inventory/update`, `GET`/`POST /api/brands`,
+`PATCH`/`DELETE /api/brands/:id`, `POST /api/components/categories`,
+`PATCH`/`DELETE /api/components/categories/:id` — five new routes, all
+role-gated except the brands GET (public, matches the components-list route's
+public-read pattern).
 
-FRONTEND CHANGES: `/admin/components/new`, `/admin/components/:id/edit` (new pages);
-`/admin` dashboard tables now have Edit/Delete actions and a "New component" link.
+FRONTEND CHANGES: `/admin/brands`, `/admin/categories` (new pages); dashboard rows
+now have an inline-editable stock cell.
 
 3D ENGINE CHANGES: none — packages/three-d-engine is still an empty stub.
 
-KNOWN ISSUES:
-- Deleting a component doesn't clean up its uploaded image objects in storage
-  (orphaned files) — acceptable for now, not a regression to "fix," just not yet
-  built (real systems often handle this via storage lifecycle rules instead).
-- `packages/database/src/index.ts`'s `export * from "@prisma/client"` produces a
-  cosmetic Turbopack build warning (CJS module, exports only known at runtime) —
-  pre-existing, not from this session, not blocking, not fixed.
-- SeaweedFS is NOT auto-starting — must be manually started each session that
-  needs image upload to actually work (see docs/DEVELOPMENT.md). It was stopped at
-  the end of this session.
+KNOWN ISSUES: none new this session. (Carried over, unchanged: orphaned storage
+objects on component delete; the cosmetic `export *` build warning.)
 
-TEST STATUS: no new automated tests this session (CRUD/UI wiring, verified by a
-real Playwright browser session end-to-end instead — appropriate for this kind of
-work, same reasoning as Milestones 2 and 5). `packages/component-models`'s 34 tests
-from Milestone 1 still pass.
+TEST STATUS: no new automated tests this session (CRUD/UI wiring again, verified
+live rather than with unit tests — same reasoning as Milestones 2, 3, and 5).
+`packages/component-models`'s 34 tests from Milestone 1 still pass.
 
 NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md +
 CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes and
-Postgres is running (SeaweedFS is NOT required unless testing image upload
-specifically), then implement Phase 2, Milestone 4 (stock management + brand/
-category management): a faster dedicated stock-quantity-update flow (the edit form
-already covers "mark unavailable" via its checkbox — Milestone 4 is about stock
-numbers specifically, and standalone brand/category management screens (currently
-brands are only created implicitly by typing a new name in the component form, and
-categories have no admin UI at all — they're fixed seed data). Stop at that
-checkpoint rather than also building CSV import/export (Milestone 5) in the same
-session.
+Postgres is running, then implement Phase 2, Milestone 5 (CSV import/export for
+bulk inventory operations). Before writing parsing code, worth deciding (ask the
+user if unclear) how `specifications` should be represented in a CSV cell — the
+natural choice is a single JSON-encoded string per row, validated the same way as
+the JSON API body via `@pcbuilder/component-models`'s `validateSpecifications`, but
+confirm this doesn't conflict with any expectation the user has for how the CSV
+should look (e.g. if they want one column per common spec field instead — that
+would be a materially different, more complex design). Stop at that checkpoint
+rather than also building the 3D asset manager (Milestone 6) in the same session.
 
 EXACT COMMANDS TO RUN THE PROJECT LOCALLY:
   pnpm install
   pnpm dev                     # apps/web on http://localhost:3000
 
-For image upload specifically (not required for most other work):
-  & "C:\seaweedfs\weed.exe" server -dir=C:\seaweedfs\data -s3 -s3.port=8333 `
-    -s3.config="<repo-path>\infrastructure\seaweedfs\s3-config.json" `
-    -s3.autoCreateBucket=true -ip=127.0.0.1 -master.port=9333 -volume.port=8080 -filer.port=8888
+Try it: `/admin/brands` and `/admin/categories` for the new management screens;
+the dashboard's stock numbers are now inline-editable (click into the box, change
+the number, a "Save" link appears).
 
 One-time per machine / after a fresh clone (all already done on this machine):
   cp packages/database/.env.example packages/database/.env
   pnpm --filter @pcbuilder/database run db:migrate
   pnpm --filter @pcbuilder/database run db:seed
-  cp apps/web/.env.example apps/web/.env.local   # fill in DATABASE_URL + generate NEXTAUTH_SECRET; S3_* defaults match infrastructure/seaweedfs/s3-config.json
+  cp apps/web/.env.example apps/web/.env.local   # fill in DATABASE_URL + generate NEXTAUTH_SECRET; S3_* only needed for image upload
 
 Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 
 Local Postgres on THIS machine: native Windows service `postgresql-x64-17` on
 localhost:5432, superuser `postgres`/`postgres`, app role `pcbuilder`/`pcbuilder`
-owning database `pcbuilder`.
+owning database `pcbuilder`. SeaweedFS (image upload only, not needed for this
+milestone's work) is NOT running — see docs/DEVELOPMENT.md to start it if needed.
 
 PATH note (still applies): if `node`/`pnpm`/`npm`/`psql` report "not recognized" in a
 fresh shell, prepend, e.g. in PowerShell:

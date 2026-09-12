@@ -1,10 +1,11 @@
 # API Reference
 
 Status: auth (Phase 1, Milestone 3), read-only component/category routes (Phase 1,
-Milestone 5), the inventory dashboard route (Phase 2, Milestone 2), and admin CRUD +
-image upload (Phase 2, Milestone 3) are all implemented; everything else is still
-design-stage. This document will be filled in with real request/response shapes as
-each remaining route is built.
+Milestone 5), the inventory dashboard route (Phase 2, Milestone 2), admin CRUD +
+image upload (Phase 2, Milestone 3), and stock/brand/category management (Phase 2,
+Milestone 4) are all implemented; everything else is still design-stage. This
+document will be filled in with real request/response shapes as each remaining
+route is built.
 
 ## Conventions
 
@@ -97,6 +98,43 @@ lowStockThreshold, updatedAt`) rather than the raw Prisma relations. Powers the
 `/admin` dashboard (`apps/web/lib/inventory.ts`'s `getInventoryOverview()`, called
 directly by both the page and this route to avoid duplicating the query logic).
 
+### `POST /api/inventory/update`
+`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ componentId, stockQuantity?, lowStockThreshold? }`
+(at least one of the two numeric fields expected, both optional so either can be
+adjusted independently). `404` if the component doesn't exist. Upserts the
+`Inventory` row (in practice it always already exists — every component gets one on
+creation — but upsert is defensive). Setting `stockQuantity` also stamps
+`lastRestockedAt = now()`. This is the fast path for routine stock adjustments,
+distinct from `PATCH /api/components/:id` which edits the component itself (model,
+price, `isAvailable`, specifications, ...).
+
+### `GET /api/brands` / `POST /api/brands`
+`GET` is public: every `Brand` with a `_count.components`. `POST` is
+`ADMIN`/`INVENTORY_MANAGER` only: `{ name, logoUrl? }`, `409` on a duplicate name.
+(Brands are also upserted implicitly by `POST /api/components`'s `brandName` field —
+this route is for managing them directly, e.g. renaming, without touching any
+component.)
+
+### `PATCH /api/brands/:id` / `DELETE /api/brands/:id`
+`ADMIN`/`INVENTORY_MANAGER` only. `PATCH`: `{ name?, logoUrl? }`, `409` on a
+duplicate name, `404` if missing. `DELETE`: `409` if any `Component` still
+references the brand (with a count in the message), `404` if missing — brands are
+never deleted out from under components that use them.
+
+### `POST /api/components/categories`
+`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ key (UPPER_SNAKE_CASE), label, sortOrder? }`.
+`409` on a duplicate key. Per ARCHITECTURE.md §4.3, a new category is purely a data
+row — a `key` with no matching schema in `@pcbuilder/component-models` just falls
+back to the permissive generic schema (see `packages/component-models/src/categories/generic.ts`)
+until a developer adds a real one; nothing else needs to change for the category to
+exist and accept components.
+
+### `PATCH /api/components/categories/:id` / `DELETE /api/components/categories/:id`
+`ADMIN`/`INVENTORY_MANAGER` only. `PATCH`: `{ label?, sortOrder? }` — `key` is
+immutable (component-models' registry and every existing `Component` row key off of
+it; renaming it would silently break their category lookup). `DELETE`: `409` if any
+`Component` still uses the category, `404` if missing.
+
 ### Route protection
 - `apps/web/proxy.ts` (Next.js 16's renamed `middleware.ts` convention) gates
   `/admin/:path*`, redirecting to `/` unless the session's JWT role is `ADMIN` or
@@ -109,7 +147,6 @@ directly by both the page and this route to avoid duplicating the query logic).
 
 | Route | Methods | Purpose | Auth |
 |---|---|---|---|
-| `/api/inventory/update` | POST | Update stock quantity / availability | ADMIN, INVENTORY_MANAGER |
 | `/api/builds` | GET/POST | List/create user builds | USER+ |
 | `/api/builds/:id` | GET/PATCH/DELETE | Load/update/delete a build | owner or ADMIN |
 | `/api/compatibility/check` | POST | Run the compatibility engine against a build/component set | USER+ |

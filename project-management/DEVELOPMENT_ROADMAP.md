@@ -107,8 +107,19 @@ Milestones (each independently shippable):
    real image upload), confirmed it via search, edited its price, confirmed the
    edit persisted, deleted it, confirmed it was gone — every step against real
    server responses, not mocked.
-4. `[ ]` Stock management: update quantity, mark unavailable, brand/category
-   management screens.
+4. `[x]` Stock management: update quantity, mark unavailable, brand/category
+   management screens. **Done 2026-09-12** — `POST /api/inventory/update`
+   (dedicated fast path for quantity/threshold, distinct from the full component
+   edit form) plus an inline stock editor on every dashboard table row
+   (`mark unavailable` already existed via Milestone 3's edit-form checkbox, so
+   this milestone focused on the stock-quantity flow specifically). Full CRUD for
+   brands (`/admin/brands`, rename + delete-if-unused) and categories
+   (`/admin/categories`, edit label/sortOrder + delete-if-unused; `key` is
+   immutable). Every mutating route verified live: create/rename/delete for both
+   brands and categories, including the "cannot delete — still in use" 409 guard
+   on real in-use rows (AMD brand, CPU category) and the inline stock editor
+   confirmed via a Playwright screenshot showing the updated value reflected after
+   save. All test data reverted afterward.
 5. `[ ]` CSV import/export for bulk inventory operations.
 6. `[ ]` 3D asset manager: upload GLTF/GLB, assign procedural fallback, record
    source/license/attribution.

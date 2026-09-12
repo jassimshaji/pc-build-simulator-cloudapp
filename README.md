@@ -70,10 +70,11 @@ pnpm test          # run tests in all packages/apps
 carrying the user's role), a session-aware top nav, a `/workspace` route with the
 three-panel layout from the project brief (still placeholder content — real
 component browsing/compatibility/3D land in later phases), and a real admin area at
-`/admin`: an inventory dashboard (stat tiles, search, low/out-of-stock views) plus
-full CRUD for components through a dynamic per-category form (generated from
-`@pcbuilder/component-models`'s Zod schemas) with image upload to S3-compatible
-object storage. `packages/database` has a real Prisma schema, migration, and seed
+`/admin`: an inventory dashboard (stat tiles, search, low/out-of-stock views, an
+inline stock-quantity editor) plus full CRUD for components through a dynamic
+per-category form (generated from `@pcbuilder/component-models`'s Zod schemas) with
+image upload to S3-compatible object storage, and standalone brand/category
+management (`/admin/brands`, `/admin/categories`). `packages/database` has a real Prisma schema, migration, and seed
 data (see `docs/DATABASE.md`). `packages/compatibility-engine` and
 `packages/three-d-engine` are still empty stubs pending Phases 3-4. See
 `project-management/PROJECT_STATUS.md` for live status.

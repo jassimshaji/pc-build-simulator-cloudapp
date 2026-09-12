@@ -1,7 +1,7 @@
 # Project Status
 
-**Current phase:** Phase 2 — Component Inventory System (Milestone 3 of 6 complete)
-**Overall completion:** ~38%
+**Current phase:** Phase 2 — Component Inventory System (Milestone 4 of 6 complete)
+**Overall completion:** ~42%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -12,59 +12,53 @@
   categories + hot-field extraction, 34 passing Vitest tests).
 - Phase 2, Milestone 2 — **Admin inventory dashboard** (stat tiles, search, out-of-
   stock/low-stock/recently-updated tables, `GET /api/inventory`).
-- Phase 2, Milestone 3 — **Admin CRUD + image upload:**
-  - `POST /api/components`, `PATCH /api/components/:id`, `DELETE
-    /api/components/:id` — all role-gated, `specifications` validated per-category
-    via `@pcbuilder/component-models`, hot columns derived server-side (never from
-    client input).
-  - `POST /api/assets` issues a short-lived presigned S3 PUT URL; the client
-    uploads image bytes directly to object storage (never through this server).
-  - Object storage: no Cloudflare R2 bucket exists yet, and MinIO (the originally
-    planned open-source local stand-in) turned out to have been discontinued.
-    Installed **SeaweedFS** instead (open-source, actively maintained, S3-compatible,
-    Windows binary) — see ADR-008 in `DECISIONS.md`. Same S3 API/env vars as
-    production R2, so swapping later is configuration only.
-  - `apps/web/lib/zod-form.ts`: introspects any `@pcbuilder/component-models` Zod
-    schema at runtime (verified Zod v4's actual internal shape empirically rather
-    than assumed from v3 experience) into a field list a form can render, plus
-    converts submitted form values back into a plausible specifications object.
-    Powers a genuinely dynamic per-category admin form (`component-form.tsx`) —
-    picking a category re-renders the right fields, including nested objects and
-    comma-separated arrays.
-  - Admin dashboard now has "New component" + per-row Edit/Delete actions.
-  - **Verified with a full Playwright browser run** against the live dev server
-    (not just API-level checks): logged in as a real admin, created a Monitor
-    component through the actual form (including a real image upload through the
-    presigned-URL flow), confirmed it via the dashboard search, edited its price
-    and confirmed the edit persisted, deleted it and confirmed it was gone.
-  - Hit and fixed a real AWS SDK v3 gotcha: presigned PUT URLs need
-    `requestChecksumCalculation: "WHEN_REQUIRED"` or they fail with `400 BadDigest`
-    against any S3-compatible server (documented inline and in ADR-008).
+- Phase 2, Milestone 3 — **Admin CRUD + image upload** (full component CRUD API,
+  a genuinely dynamic per-category admin form driven by Zod schema introspection,
+  presigned-URL image uploads to a self-hosted SeaweedFS S3-compatible server).
+- Phase 2, Milestone 4 — **Stock management + brand/category management:**
+  - `POST /api/inventory/update`: dedicated fast path for adjusting
+    stockQuantity/lowStockThreshold, distinct from the full component edit form.
+  - Inline stock editor (`apps/web/app/admin/stock-cell.tsx`) on every dashboard
+    table row — edit the number, a "Save" affordance appears only when the value
+    actually changed, saves via the new route and refreshes.
+  - Full brand management: `/admin/brands` (list with per-brand component counts,
+    create, rename, delete-if-unused — delete is disabled in the UI and 409s at
+    the API when any component still references the brand).
+  - Full category management: `/admin/categories` (list with component counts,
+    create, edit label/sortOrder, delete-if-unused; `key` is immutable once
+    created since component-models' registry keys off of it).
+  - **Verified live, not just via typecheck:** brand create → rename → delete
+    (unused, succeeds) and delete-while-in-use (AMD, 409) via direct API calls;
+    same pattern for categories (created a real "HDD" category, relabeled it,
+    deleted it, then confirmed deleting the in-use "CPU" category correctly 409s);
+    inventory update confirmed by setting a real component's stock to 42 and
+    reading it back via the detail endpoint; a full Playwright pass screenshotted
+    `/admin/brands`, `/admin/categories`, and the dashboard after using the inline
+    stock editor (visually confirmed the saved value persists). All test data
+    (a throwaway brand, a throwaway category, a temporarily-changed stock value,
+    a test user) cleaned up afterward.
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Milestone 4 (stock
-  management + brand/category management).
+- Nothing — at a checkpoint awaiting user instruction to start Milestone 5 (CSV
+  import/export).
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 2: stock/brand/category management (Milestone 4), CSV import/export
-  (Milestone 5), 3D asset manager (Milestone 6).
+- Phase 2: CSV import/export (Milestone 5), 3D asset manager (Milestone 6).
 - Phase 3: compatibility engine implementation + tests, power calculation.
 - Phase 4: 3D workspace (R3F canvas, procedural generators, install zones, click-to-place).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
 
 ## Known issues
-- None blocking. Deleting a component does not clean up its uploaded image objects
-  in object storage (orphaned files) — acceptable for now (real apps commonly handle
-  this via storage lifecycle policies rather than app-level cleanup), noted here so
-  it isn't mistaken for an oversight later.
+- None blocking. (Carried over from Milestone 3: deleting a component doesn't clean
+  up its uploaded image objects in storage; a cosmetic Turbopack build warning about
+  `export *` in packages/database's index — neither is new this session.)
 
 ## Blockers
-- None. (SeaweedFS must be started manually each session that needs image upload —
-  see docs/DEVELOPMENT.md — but this doesn't block any other work.)
+- None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 2, Milestone 4: Stock management + brand/category
-management** (a dedicated stock-update flow, and standalone screens for managing
-brands/categories directly rather than only via the component form). See
-`SESSION_CHECKPOINT.md` for exact resume details.
+Say "Continue" to begin **Phase 2, Milestone 5: CSV import/export** for bulk
+inventory operations. Worth deciding the CSV shape for the `specifications` column
+(varies per category — likely a JSON-encoded string per cell) before writing parsing
+code. See `SESSION_CHECKPOINT.md` for exact resume details.

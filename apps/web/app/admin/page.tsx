@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/requireRole";
 import { getInventoryOverview, searchAllComponents, type InventoryRow } from "@/lib/inventory";
 import { DeleteComponentButton } from "./delete-component-button";
+import { StockCell } from "./stock-cell";
 
 function ComponentTable({ rows, emptyMessage }: { rows: InventoryRow[]; emptyMessage: string }) {
   if (rows.length === 0) {
@@ -37,7 +38,9 @@ function ComponentTable({ rows, emptyMessage }: { rows: InventoryRow[]; emptyMes
               <td className="px-3 py-2 text-zinc-400">{row.sku}</td>
               <td className="px-3 py-2 text-zinc-400">{row.categoryLabel}</td>
               <td className="px-3 py-2 text-zinc-400">{row.brandName}</td>
-              <td className="px-3 py-2 text-zinc-400">{row.stockQuantity}</td>
+              <td className="px-3 py-2">
+                <StockCell componentId={row.id} stockQuantity={row.stockQuantity} />
+              </td>
               <td className="px-3 py-2 text-zinc-400">
                 {row.updatedAt.toLocaleDateString()}
               </td>
@@ -83,12 +86,26 @@ export default async function AdminPage({
               Signed in as {result.session.user.email} ({result.session.user.role}).
             </p>
           </div>
-          <Link
-            href="/admin/components/new"
-            className="rounded bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-950"
-          >
-            New component
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/brands"
+              className="rounded border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200"
+            >
+              Brands
+            </Link>
+            <Link
+              href="/admin/categories"
+              className="rounded border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200"
+            >
+              Categories
+            </Link>
+            <Link
+              href="/admin/components/new"
+              className="rounded bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-950"
+            >
+              New component
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
@@ -153,8 +170,7 @@ export default async function AdminPage({
         </section>
 
         <p className="text-xs text-zinc-600">
-          Stock quantity updates and brand/category management land in Phase 2,
-          Milestone 4.
+          CSV import/export and the 3D asset manager land in Phase 2, Milestones 5-6.
         </p>
       </div>
     </div>
