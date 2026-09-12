@@ -67,9 +67,11 @@ pnpm test          # run tests in all packages/apps
 ```
 
 `apps/web` now has working registration/login (`/register`, `/login`), sessions
-(next-auth v4, JWT strategy carrying the user's role), and a role-gated `/admin`
-placeholder — but no other real pages/API yet (no component/inventory data flows
-through it). `packages/database` has a real Prisma schema, migration, and seed data
+(next-auth v4, JWT strategy carrying the user's role), a role-gated `/admin`
+placeholder, a session-aware top nav, and a `/workspace` route with the three-panel
+layout from the project brief (inventory / 3D area / details+compatibility, all still
+placeholder content). No component/inventory data flows through the UI yet — that's
+Milestone 5. `packages/database` has a real Prisma schema, migration, and seed data
 (see `docs/DATABASE.md`). The other `packages/*` are still empty stubs pending Phases
 2-4. See `project-management/PROJECT_STATUS.md` for live status.
 

@@ -2,6 +2,26 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 1, Milestone 4: Base app shell UI
+- Committed to a single dark "engineering tool" theme in `app/globals.css` (dropped
+  the create-next-app default of following OS light/dark preference — this is a
+  workspace tool, not a marketing site).
+- Added a session-aware top nav (`components/nav.tsx`, rendered on every page) with
+  brand, Workspace link, conditional Admin link, and sign-in/register or
+  email+role+sign-out state.
+- Added `/workspace`: the three-panel layout from the project brief (inventory panel
+  with a static category list + disabled search, center 3D-area placeholder with
+  disabled camera controls, right details/compatibility panel, bottom build-summary
+  bar), responsive down to mobile widths (panels stack vertically below `lg`).
+- Simplified the home page and restyled login/register/admin pages to match the new
+  committed theme.
+- Verified visually, not just by typecheck: installed Playwright in a scratch
+  directory (not a project dependency), screenshotted the key pages at desktop and
+  mobile widths against the real running dev server, and confirmed no horizontal
+  overflow, correct responsive stacking, and no console errors.
+- Stopped at the Phase 1 / Milestone 4 checkpoint; the components API (Milestone 5,
+  the last Phase 1 milestone) is next, pending user "Continue".
+
 ## 2026-09-12 — Phase 1, Milestone 3: Auth
 - Wired next-auth v4 (Credentials provider, JWT sessions) into `apps/web`, querying
   the existing `User`/`Role` model directly via `@pcbuilder/database` — no Prisma

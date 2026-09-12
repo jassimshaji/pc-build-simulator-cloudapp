@@ -48,9 +48,15 @@ Milestones (each independently shippable):
    redirect for a `USER`-role session and 200 after promoting to `ADMIN` in the DB
    and re-authenticating. `middleware.ts` written as `proxy.ts` per Next.js 16's
    renamed convention (confirmed the deprecation warning disappears).
-4. `[ ]` Base app shell UI: top nav, the three-panel workspace layout (inventory /
+4. `[x]` Base app shell UI: top nav, the three-panel workspace layout (inventory /
    3D area placeholder / details+compatibility), responsive breakpoints, dark
-   "engineering tool" theme.
+   "engineering tool" theme. **Done 2026-09-12** — committed dark theme (not tied
+   to OS preference), session-aware nav (`components/nav.tsx`) shown on every page,
+   `/workspace` route with the three-panel + bottom summary bar layout (all
+   placeholder content — real data is Milestones 5+/Phases 2-4). Verified visually
+   via a Playwright screenshot check at desktop (1280px) and mobile (400px) widths:
+   no horizontal overflow, panels correctly stack vertically on narrow screens, no
+   console errors, `pnpm build`/`typecheck`/`lint` all pass.
 5. `[ ]` `/api/components` (list/search/filter/get-by-id) backed by real DB data.
 
 **Checkpoint** after each milestone; stop for explicit "Continue" at the end of the phase (or earlier if a milestone alone fills a session).

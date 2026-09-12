@@ -57,7 +57,7 @@ export default function RegisterPage() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
           />
         </div>
 
@@ -71,7 +71,7 @@ export default function RegisterPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
           />
         </div>
 
@@ -86,21 +86,21 @@ export default function RegisterPage() {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100"
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-400">{error}</p>}
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
+          className="w-full rounded bg-zinc-100 px-4 py-2 text-zinc-950 disabled:opacity-50"
         >
           {isSubmitting ? "Creating account..." : "Create account"}
         </button>
 
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-zinc-400">
           Already have an account?{" "}
           <Link href="/login" className="font-medium underline">
             Log in
