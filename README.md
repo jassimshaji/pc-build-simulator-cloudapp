@@ -18,7 +18,7 @@ definition.
 
 ## Technology Stack
 
-- **Frontend:** Next.js 14 (App Router), React, TypeScript, Tailwind CSS, shadcn/ui
+- **Frontend:** Next.js (App Router), React, TypeScript, Tailwind CSS, shadcn/ui
 - **3D:** Three.js, React Three Fiber, @react-three/drei
 - **Backend:** Next.js API route handlers, business logic in framework-agnostic
   `packages/*`
@@ -50,9 +50,25 @@ pc-builder-platform/
 
 ## Installation & Running Locally
 
-Not yet available — no application code has been scaffolded. This section will be
-filled in during Phase 1, Milestone 1 (monorepo scaffold). Track progress in
-`project-management/PROJECT_STATUS.md`.
+Requires Node.js 20+ and pnpm.
+
+```
+pnpm install
+pnpm dev          # starts apps/web at http://localhost:3000
+```
+
+Other useful root scripts (run via Turborepo across all workspace packages):
+
+```
+pnpm build        # build all packages/apps
+pnpm typecheck     # typecheck all packages/apps
+pnpm lint          # lint all packages/apps
+pnpm test          # run tests in all packages/apps
+```
+
+Only `apps/web` (a default Next.js starter page so far) is functional at this point.
+The `packages/*` are empty stubs pending Phases 2-4. There is no database, auth, or
+API yet — see `project-management/PROJECT_STATUS.md` for live status.
 
 ## Running Tests
 

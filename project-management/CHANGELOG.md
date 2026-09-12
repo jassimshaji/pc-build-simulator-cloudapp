@@ -2,6 +2,27 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 1, Milestone 1: Monorepo scaffold
+- Installed Node.js 24 LTS (via winget) and pnpm 12.4.1 (via `npm install -g pnpm`) —
+  the dev machine had neither beforehand.
+- Set up the pnpm + Turborepo workspace at the repo root (`pnpm-workspace.yaml`,
+  `package.json`, `turbo.json`, `tsconfig.base.json`, `.prettierrc.json`, `.nvmrc`).
+- Scaffolded `apps/web` as a real Next.js (v16.3.4) + TypeScript + Tailwind CSS v4 +
+  ESLint app via `create-next-app`, wired into the workspace (removed the nested
+  workspace files create-next-app generates by default).
+- Created stub packages `@pcbuilder/database`, `@pcbuilder/compatibility-engine`,
+  `@pcbuilder/component-models`, `@pcbuilder/three-d-engine`, `@pcbuilder/shared`
+  (package.json + tsconfig + empty `src/index.ts` each), all building/typechecking.
+- Verified end-to-end: `pnpm install`, `pnpm typecheck`, `pnpm build` all pass across
+  all 6 workspace packages; `pnpm dev` serves the app on `localhost:3000` (HTTP 200
+  confirmed), then was stopped cleanly.
+- Updated architecture docs to stop pinning "Next.js 14" (a planning-time
+  placeholder) in favor of "Next.js (App Router)", since `create-next-app@latest`
+  resolved to v16. Filled in real run instructions in `README.md` and
+  `docs/DEVELOPMENT.md`.
+- Stopped at the Phase 1 / Milestone 1 checkpoint per the "one milestone per session"
+  rule; database schema (Milestone 2) is next, pending user "Continue".
+
 ## 2026-09-12 — Phase 0: Architecture & Planning
 - Inspected repository: confirmed empty/greenfield directory, no prior project or git history.
 - Established technology stack: Next.js 14 + TypeScript + Tailwind + R3F/Three.js

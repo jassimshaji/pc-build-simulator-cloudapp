@@ -1,17 +1,28 @@
 # Development Guide
 
-Status: design-stage — filled in fully once Phase 1, Milestone 1 (monorepo scaffold)
-lands. For now this records the intended setup and testing strategy.
+## Local setup (current — Phase 1, Milestone 1 scope)
 
-## Intended local setup (once scaffolded)
+Requires Node.js 20+ (LTS) and pnpm (`corepack enable` or `npm i -g pnpm`).
 
 ```
 pnpm install
+pnpm dev              # runs apps/web via Turborepo -> http://localhost:3000
+```
+
+Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` — each
+runs across every workspace package via Turborepo.
+
+Only `apps/web` does anything right now (the Next.js starter page). The `packages/*`
+workspaces are empty stubs (`export {}`) that typecheck/build successfully but have no
+real code yet — that lands in Phases 2-4.
+
+## Once the database exists (Phase 1, Milestone 2 — not yet built)
+
+```
 cp .env.example .env.local   # fill in DATABASE_URL etc.
 docker compose -f docker/docker-compose.yml up -d   # local Postgres
-pnpm --filter database exec prisma migrate dev
-pnpm --filter database exec prisma db seed
-pnpm --filter web dev
+pnpm --filter @pcbuilder/database exec prisma migrate dev
+pnpm --filter @pcbuilder/database exec prisma db seed
 ```
 
 ## Testing strategy

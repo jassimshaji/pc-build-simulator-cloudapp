@@ -1,17 +1,16 @@
 # Current Phase
 
-**Phase 0 — Architecture & Planning: COMPLETE**
+**Phase 1 — Core Cloud Application Foundation: IN PROGRESS**
 
-All architecture, database design, compatibility engine design, 3D engine design, and
-cloud deployment design are documented in `ARCHITECTURE.md`. The development roadmap
-is in `DEVELOPMENT_ROADMAP.md`.
+Milestone 1 (monorepo scaffold) is complete and verified. See
+`DEVELOPMENT_ROADMAP.md` → Phase 1 for the full milestone list.
 
-**Waiting for explicit user instruction ("Continue" / "Resume development" / "Continue
-from the last checkpoint") before starting Phase 1.**
+## Next up: Phase 1, Milestone 2 — Database schema
+`packages/database`: Prisma schema for User/Brand/ComponentCategory/Component/
+Inventory/ThreeDAsset/CompatibilityRule/PCBuild/BuildComponent (see
+`ARCHITECTURE.md` §4 for the designed schema), initial migration, seed script with a
+handful of real-ish components per category. Requires a local Postgres — the plan is
+`docker/docker-compose.yml` for local dev (not yet created).
 
-## Next phase queued: PHASE 1 — Core Cloud Application Foundation
-First milestone when resumed: **Monorepo scaffold** —
-pnpm workspace + Turborepo config, `apps/web` Next.js 14 + TypeScript + Tailwind
-skeleton, `packages/*` stubs, shared tsconfig/ESLint/Prettier. See
-`DEVELOPMENT_ROADMAP.md` → Phase 1 → Milestone 1 for the exact scope, and
-`SESSION_CHECKPOINT.md` for the exact resume state.
+Waiting for explicit user instruction ("Continue" / "Resume development") before
+starting Milestone 2. See `SESSION_CHECKPOINT.md` for exact resume state.

@@ -7,7 +7,7 @@ read that for anything beyond a quick orientation.
 
 ## In one paragraph
 
-A Next.js 14 (App Router) monorepo app renders a React Three Fiber 3D workspace where
+A Next.js (App Router) monorepo app renders a React Three Fiber 3D workspace where
 users assemble a PC from a component inventory backed by PostgreSQL (via Prisma) with
 a hybrid relational/JSONB schema. A framework-agnostic `packages/compatibility-engine`
 validates every placement (socket match, clearance, power budget, etc.) and a

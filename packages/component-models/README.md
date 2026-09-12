@@ -6,6 +6,7 @@ Cooler, Monitor, Case LCD, and a generic/open schema for future categories), plu
 per-category "hot field" extraction functions used to populate `Component`'s indexed
 columns.
 
-**Status:** not yet scaffolded. Scheduled as Phase 2, Milestone 1 in
-`../../project-management/DEVELOPMENT_ROADMAP.md`. See
+**Status:** package stub only (`@pcbuilder/component-models`, empty `src/index.ts`,
+`zod` dependency wired in). The per-category schemas are scheduled as Phase 2,
+Milestone 1 in `../../project-management/DEVELOPMENT_ROADMAP.md`. See
 `../../project-management/ARCHITECTURE.md` §5.

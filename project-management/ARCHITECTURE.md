@@ -13,7 +13,7 @@ holds a shorter, onboarding-friendly summary that points back here for depth.
 | Layer | Choice | Why |
 |---|---|---|
 | Monorepo tooling | pnpm workspaces + Turborepo | Fast incremental builds/caching, first-class support for the `apps/*` + `packages/*` split the spec asks for, no need for Nx's heavier config. |
-| Frontend framework | Next.js 14 (App Router) + React 18 + TypeScript | SSR/CSR hybrid, file-based routing, API routes double as the backend for the MVP, huge ecosystem, deploys natively to Vercel. |
+| Frontend framework | Next.js (App Router, v16 as scaffolded) + React 19 + TypeScript | SSR/CSR hybrid, file-based routing, API routes double as the backend for the MVP, huge ecosystem, deploys natively to Vercel. Scaffolded with whatever is current stable at implementation time rather than pinned to a specific major named at planning time. |
 | Styling / UI kit | Tailwind CSS + shadcn/ui (Radix primitives) | Fast to build a professional engineering-tool UI; shadcn components are copy-in (no opaque dependency), easy to theme for dark "workspace" look. |
 | 3D rendering | Three.js + React Three Fiber (R3F) + @react-three/drei | R3F lets the 3D scene be expressed as React components co-located with app state (Zustand store), which keeps "select → highlight zone → place" interaction logic in one place instead of imperative Three.js scattered around. Drei gives OrbitControls, GLTF loading helpers, Html overlays for in-scene labels. |
 | Backend | Next.js Route Handlers (`app/api/**`) for MVP; business logic lives in framework-agnostic packages | Avoids a premature microservice split. If load ever demands it, the route handlers are thin adapters over `packages/*` logic, so extracting a standalone service later is a lift-and-shift, not a rewrite. |
@@ -94,7 +94,7 @@ unit-testable in isolation and portable if the API layer ever moves off Next.js.
 pc-builder-platform/
 │
 ├── apps/
-│   └── web/                      # Next.js 14 app (UI + API route handlers)
+│   └── web/                      # Next.js app (UI + API route handlers)
 │
 ├── packages/
 │   ├── database/                 # Prisma schema, migrations, generated client, seed scripts

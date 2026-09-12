@@ -1,44 +1,43 @@
 # Project Status
 
-**Current phase:** Phase 0 — Architecture & Planning
-**Overall completion:** ~3% (architecture/planning complete; zero application code written yet — this is expected and correct per the phased plan, not a gap)
+**Current phase:** Phase 1 — Core Cloud Application Foundation (Milestone 1 of 5 complete)
+**Overall completion:** ~8%
 
 ## Completed
-- Repository inspected and confirmed greenfield (empty directory, no prior project).
-- Technology stack selected and justified (`ARCHITECTURE.md` §1).
-- System architecture, repo structure, database design (hybrid relational/JSONB),
-  component data model strategy, compatibility engine design, 3D engine design, and
-  cloud deployment architecture all documented (`ARCHITECTURE.md`).
-- Development roadmap with phased milestones (`DEVELOPMENT_ROADMAP.md`).
-- Full project-management continuity system created (this directory).
-- Directory skeleton created (`apps/web`, `packages/*`, `docs`, `infrastructure`,
-  `scripts`, `docker`), root `README.md`, `.env.example`, `.gitignore`, and `docs/`
-  stub files (API.md, DATABASE.md, DEVELOPMENT.md, DEPLOYMENT.md, ARCHITECTURE.md summary).
-- Git repository initialized with an initial commit.
+- Phase 0: full architecture, database design, compatibility engine design, 3D engine
+  design, cloud deployment design, and the project-management continuity system.
+- Phase 1, Milestone 1 — **Monorepo scaffold:**
+  - Node.js 24 LTS and pnpm 12 installed on the dev machine (were missing entirely).
+  - pnpm workspace (`pnpm-workspace.yaml`) + Turborepo (`turbo.json`) at the repo root.
+  - `apps/web`: real Next.js (v16.3.4) + TypeScript + Tailwind CSS v4 + ESLint app,
+    scaffolded via `create-next-app`, wired into the workspace.
+  - `packages/database`, `packages/compatibility-engine`, `packages/component-models`,
+    `packages/three-d-engine`, `packages/shared`: package.json + tsconfig.json + empty
+    `src/index.ts` stubs, all building/typechecking successfully.
+  - Shared `tsconfig.base.json`, root `.prettierrc.json`, `.nvmrc`.
+  - **Verified:** `pnpm install`, `pnpm typecheck`, and `pnpm build` all succeed across
+    all 6 workspace packages; `pnpm dev` serves the app at `http://localhost:3000`
+    (confirmed HTTP 200 response), then was stopped cleanly.
 
 ## In progress
-- Nothing — Phase 0 is complete and the project is at a checkpoint awaiting user
-  instruction to begin Phase 1.
+- Nothing — at a checkpoint awaiting user instruction to start Milestone 2.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 1: monorepo scaffold, database schema + Prisma, auth, base app shell, first
-  read-only components API.
-- Phase 2: full inventory admin system (CRUD, stock, CSV import/export, 3D asset manager).
-- Phase 3: compatibility engine implementation + tests, power calculation, text-only build flow.
+- Phase 1: database schema/Prisma (Milestone 2), auth (Milestone 3), base app shell UI
+  (Milestone 4), first components API (Milestone 5).
+- Phase 2: full inventory admin system.
+- Phase 3: compatibility engine implementation + tests, power calculation.
 - Phase 4: 3D workspace (R3F canvas, procedural generators, install zones, click-to-place).
 - Phase 5: build save/load/share/summary.
-- Phase 6: fan/airflow visualization (rule-based simulation).
-- Post-MVP backlog: thermal simulation, performance estimation, advanced analytics.
+- Phase 6: fan/airflow visualization.
 
 ## Known issues
-- None — no code exists yet to have issues.
+- None currently.
 
 ## Blockers
-- None. Waiting on explicit user go-ahead to start Phase 1 (per the project's own
-  "never continue automatically" rule).
+- None. Node.js/pnpm are now installed and working, resolving the earlier environment gap.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 1, Milestone 1: Monorepo scaffold** (pnpm workspace +
-Turborepo, `apps/web` Next.js 14/TS/Tailwind skeleton, `packages/*` stubs). See
-`SESSION_CHECKPOINT.md` for exact resume details and `DEVELOPMENT_ROADMAP.md` for the
-full milestone list.
+Say "Continue" to begin **Phase 1, Milestone 2: Database schema** (Prisma schema +
+migration + seed script in `packages/database`, plus a local Postgres via
+docker-compose). See `SESSION_CHECKPOINT.md` for exact resume details.

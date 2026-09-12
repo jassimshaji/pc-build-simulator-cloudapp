@@ -27,9 +27,11 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 
 ## PHASE 1 — Core Cloud Application Foundation
 Milestones (each independently shippable):
-1. `[ ]` Monorepo scaffold: pnpm workspace + Turborepo config, root `package.json`,
-   `apps/web` Next.js 14 + TS + Tailwind skeleton, `packages/*` package.json stubs,
-   shared `tsconfig.base.json`, ESLint/Prettier config.
+1. `[x]` Monorepo scaffold: pnpm workspace + Turborepo config, root `package.json`,
+   `apps/web` Next.js + TS + Tailwind skeleton, `packages/*` package.json stubs,
+   shared `tsconfig.base.json`, ESLint/Prettier config. **Done 2026-09-12** — verified
+   `pnpm install`, `pnpm typecheck`, `pnpm build` all pass across all 6 workspace
+   packages, and `pnpm dev` serves the Next.js app on localhost:3000 (HTTP 200).
 2. `[ ]` `packages/database`: Prisma schema for User/Brand/ComponentCategory/Component/
    Inventory/ThreeDAsset/CompatibilityRule/PCBuild/BuildComponent, initial migration,
    seed script with a handful of real-ish components per category.
