@@ -6,8 +6,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test": "echo \"no tests yet\" && exit 0"
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
@@ -15,7 +15,8 @@
     "@types/three": "^0.185.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

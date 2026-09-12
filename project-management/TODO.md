@@ -39,7 +39,7 @@ of duplicates — update status in place rather than re-adding a task.
 
 ## Phase 4 — 3D Workspace Foundation
 - [COMPLETED] three-d-engine scaffold + R3F canvas + camera controls
-- [TODO] Procedural generators: Case, Motherboard, CPU, RAM, GPU, PSU
+- [COMPLETED] Procedural generators: Case, Motherboard, CPU, RAM, GPU, PSU
 - [TODO] Installation zone system generated from case spec + zone highlighting
 - [TODO] Click-to-place interaction wired to compatibility engine
 - [TODO] Remaining procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD

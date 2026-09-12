@@ -2,6 +2,31 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 4, Milestone 2: procedural generators
+- Six pure, framework-agnostic generator functions in
+  `packages/three-d-engine/src/procedural/`: `createGenericCase`,
+  `createGenericMotherboard`, `createGenericCpu`, `createGenericGpu`,
+  `createGenericRam`, `createGenericPsu` — each builds a plain `THREE.Group`
+  sized from real spec dimensions (via a shared `mm()` unit converter),
+  matching ARCHITECTURE.md §7.3's documented parameter shapes exactly. Case
+  renders as a wireframe shell so future placed components stay visible
+  inside it; the rest are simple boxes/cylinders with distinct colors
+  (per ADR-004 — generic, not photorealistic, by design).
+- 18 new Vitest tests verify actual bounding-box geometry against inputs and
+  that different form-factor/size inputs produce genuinely different shapes.
+- `WorkspaceCanvas` temporarily renders all six in a row as a visual smoke
+  test (explicitly marked throwaway — real installation-zone-driven placement
+  is Milestones 3-4).
+- Pinned the package's new `vitest` dependency to `^3.2.4` to match the
+  version already used by `compatibility-engine`/`component-models`, rather
+  than accepting the newer major version pnpm resolved by default.
+- Caught and fixed a real bug via live Playwright screenshots (not just unit
+  tests, which only check geometry): the initial near-black color palette was
+  nearly invisible against the scene's dark background. Fixed with a lighter,
+  clearly-contrasting palette and higher ambient light intensity.
+- Whole-workspace `pnpm typecheck` (11/11), `pnpm build` (6/6), `pnpm test`
+  (126/126, up from 108), `pnpm --filter web run lint` (clean) all pass.
+
 ## 2026-09-12 — Phase 4, Milestone 1: three-d-engine scaffold
 - `packages/three-d-engine` gains real dependencies: `three`,
   `@react-three/fiber` (v9, React 19-compatible), `@react-three/drei`

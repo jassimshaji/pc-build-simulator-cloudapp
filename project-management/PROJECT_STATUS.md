@@ -1,8 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 4, Milestone 1 COMPLETE (three-d-engine scaffold) —
-next up is Milestone 2 (procedural generators for Case/Motherboard/CPU/RAM/GPU/PSU)
-**Overall completion:** ~64%
+**Current phase:** Phase 4, Milestone 2 COMPLETE (procedural generators) —
+next up is Milestone 3 (installation zone system)
+**Overall completion:** ~66%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -106,15 +106,34 @@ horizontal overflow).
   camera (confirmed by comparing before/after screenshots), "Reset view"
   restores the exact initial framing, and the canvas resizes correctly with
   no horizontal overflow at 400px mobile width.
+- **Phase 4, Milestone 2 — procedural generators:** six pure, framework-agnostic
+  generator functions in `packages/three-d-engine/src/procedural/`
+  (`createGenericCase`, `createGenericMotherboard`, `createGenericCpu`,
+  `createGenericGpu`, `createGenericRam`, `createGenericPsu`), each building a
+  plain `THREE.Group` from real spec dimensions (converted from mm via a shared
+  `mm()` helper — 1 scene unit = 1 meter) — matching the exact parameter shapes
+  documented in ARCHITECTURE.md §7.3. Case renders as a wireframe shell (so
+  future placed components stay visible inside it); the rest are simple
+  boxes/cylinders with a distinct color per category (per ADR-004, not
+  photorealistic by design). 18 new Vitest tests verify each generator's
+  actual bounding-box dimensions match its inputs and that different
+  form-factor/size inputs produce genuinely different geometry. `WorkspaceCanvas`
+  temporarily renders all six in a row as a visual smoke test (clearly marked
+  as throwaway — real placement is Milestones 3-4). Caught and fixed a real bug
+  via live Playwright screenshots: the initial color palette (near-black grays)
+  was nearly invisible against the scene's dark background — switched to a
+  lighter, clearly-contrasting palette and bumped ambient light intensity.
+  Verified live: all 6 models render as distinct, correctly-shaped, visually
+  legible objects with zero console errors.
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 2.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 3.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 4: procedural generators (Milestone 2), installation zone system
-  (Milestone 3), click-to-place wired to the compatibility engine (Milestone
-  4), remaining procedural generators (Milestone 5), GLTF asset loading
-  (Milestone 6).
+- Phase 4: installation zone system (Milestone 3), click-to-place wired to the
+  compatibility engine (Milestone 4), remaining procedural generators
+  (Milestone 5: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD), GLTF asset
+  loading (Milestone 6).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
 
@@ -127,6 +146,7 @@ horizontal overflow).
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 4, Milestone 2: procedural generators** for
-Case, Motherboard, CPU, RAM, GPU, and PSU — the components needed for a
-minimal end-to-end build. See `SESSION_CHECKPOINT.md` for exact resume details.
+Say "Continue" to begin **Phase 4, Milestone 3: installation zone system** —
+a static list of named mounting zones generated from a placed Case's spec,
+with zone highlighting on component selection. See `SESSION_CHECKPOINT.md`
+for exact resume details.

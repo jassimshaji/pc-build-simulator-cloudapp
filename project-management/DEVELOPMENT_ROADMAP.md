@@ -173,7 +173,7 @@ Milestones (each independently shippable):
 ## PHASE 4 — 3D Workspace Foundation
 1. `[x]` `packages/three-d-engine` scaffold, R3F canvas mounted in the workspace page,
    camera controls (orbit/zoom/pan/reset).
-2. `[ ]` Procedural generators for Case, Motherboard, CPU, RAM, GPU, PSU (the
+2. `[x]` Procedural generators for Case, Motherboard, CPU, RAM, GPU, PSU (the
    components needed for a minimal end-to-end build).
 3. `[ ]` Installation zone system generated from a placed Case's spec; zone
    highlighting on component selection.
