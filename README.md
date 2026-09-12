@@ -5,9 +5,11 @@ Browse real/configurable PC components, assemble a build in an interactive 3D
 workspace, get live compatibility and power-draw feedback, and save/share builds. An
 admin dashboard manages the component catalog, stock, and 3D assets.
 
-**Project status:** Phase 0 (architecture) complete, no application code yet. See
-`project-management/PROJECT_STATUS.md` for the live status and
-`project-management/SESSION_CHECKPOINT.md` for exact resume instructions.
+**Project status:** Phases 0-3 complete (architecture, core app foundation,
+component inventory, compatibility engine + power calculator) — Phase 4 (3D
+Workspace Foundation) is next. See `project-management/PROJECT_STATUS.md` for
+the live status and `project-management/SESSION_CHECKPOINT.md` for exact
+resume instructions.
 
 ## Project Overview
 
@@ -67,9 +69,7 @@ pnpm test          # run tests in all packages/apps
 ```
 
 `apps/web` has working registration/login, sessions (next-auth v4, JWT strategy
-carrying the user's role), a session-aware top nav, a `/workspace` route with the
-three-panel layout from the project brief (still placeholder content — real
-component browsing/compatibility/3D land in later phases), and a real admin area at
+carrying the user's role), a session-aware top nav, and a real admin area at
 `/admin`: an inventory dashboard (stat tiles, search, low/out-of-stock views, an
 inline stock-quantity editor) plus full CRUD for components through a dynamic
 per-category form (generated from `@pcbuilder/component-models`'s Zod schemas) with
@@ -78,13 +78,18 @@ management (`/admin/brands`, `/admin/categories`), CSV import/export
 (`/admin/import-export`), and a 3D asset manager
 (`/admin/components/:id/asset`) for assigning GLTF/GLB uploads or procedural
 fallback generators per component. **Phase 2 (Component Inventory System) is
-complete.** `packages/database` has a real Prisma schema, migration, and seed
-data (see `docs/DATABASE.md`). `packages/compatibility-engine` now has 15 real
-compatibility rules (CPU↔socket, RAM↔motherboard, GPU↔case/motherboard,
-case↔motherboard form factor, cooling↔CPU/case, storage interface
-availability, PSU wattage/connectors) plus a power calculator, all running
-through `runCompatibilityCheck()`. `packages/three-d-engine` is still an empty
-stub pending Phase 4. See `project-management/PROJECT_STATUS.md` for live status.
+complete.** `packages/compatibility-engine` has 15 real compatibility rules
+(CPU↔socket, RAM↔motherboard, GPU↔case/motherboard, case↔motherboard form
+factor, cooling↔CPU/case, storage interface availability, PSU
+wattage/connectors) plus a power calculator, all running through
+`runCompatibilityCheck()`. The `/workspace` route is now a real, interactive
+text-only build flow: browse/search real components, add them to a build, and
+see live compatibility results and estimated power update via
+`POST /api/compatibility/check` — the center 3D pane is still a placeholder.
+**Phase 3 (Compatibility Engine & Power Calculation) is complete.**
+`packages/database` has a real Prisma schema, migration, and seed data (see
+`docs/DATABASE.md`). `packages/three-d-engine` is still an empty stub pending
+Phase 4. See `project-management/PROJECT_STATUS.md` for live status.
 
 Setup requires a local PostgreSQL server (`docs/DATABASE.md`), an
 `apps/web/.env.local` (`docs/DEVELOPMENT.md` has the exact steps, including

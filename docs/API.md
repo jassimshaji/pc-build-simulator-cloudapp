@@ -183,6 +183,22 @@ or as a `ThreeDAsset.url`) once the upload succeeds. See `apps/web/lib/storage.t
 and `docs/DEVELOPMENT.md`'s object storage section for the local (SeaweedFS) vs.
 production (Cloudflare R2) setup — same code, different env vars.
 
+### `POST /api/compatibility/check`
+Public — read-only and computed entirely from public catalog data, so no
+different in trust level from browsing `/api/components`. Body:
+`{ selections: [{ componentId, quantity? }] }` (`quantity` defaults to `1`).
+Looks up each `componentId` (via `apps/web/lib/compatibility.ts`), silently
+skips unknown/deleted ids and components in categories the compatibility
+engine doesn't model yet (e.g. `MONITOR`, `CASE_LCD`) rather than failing the
+whole check, and calls `@pcbuilder/compatibility-engine`'s
+`runCompatibilityCheck()`. Returns a `CompatibilityReport`: `{ overallStatus:
+"OK"|"WARNING"|"ERROR", results: [{ ruleKey, compatible, severity, message,
+affectedComponents }], estimatedPowerWatts, recommendedPsuWattage }`. `400` on
+malformed input (missing `componentId`, etc.). This is the same
+`runCompatibilityCheck()` the `/workspace` build flow UI calls, per
+ARCHITECTURE.md §6's single-source-of-truth requirement — no compatibility
+logic is duplicated between this route and the UI.
+
 ### Route protection
 - `apps/web/proxy.ts` (Next.js 16's renamed `middleware.ts` convention) gates
   `/admin/:path*`, redirecting to `/` unless the session's JWT role is `ADMIN` or
@@ -197,6 +213,5 @@ production (Cloudflare R2) setup — same code, different env vars.
 |---|---|---|---|
 | `/api/builds` | GET/POST | List/create user builds | USER+ |
 | `/api/builds/:id` | GET/PATCH/DELETE | Load/update/delete a build | owner or ADMIN |
-| `/api/compatibility/check` | POST | Run the compatibility engine against a build/component set | USER+ |
 
 Each route will be documented here with request/response JSON examples as it's built.

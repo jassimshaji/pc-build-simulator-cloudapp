@@ -34,8 +34,8 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] Engine scaffold + result/report types
 - [COMPLETED] Rules: CPU socket, RAM, GPU clearance, case form factor, cooling, storage interface
 - [COMPLETED] Power calculator + PSU wattage/connector checks
-- [TODO] `/api/compatibility/check` + text-only build flow UI
-- [TODO] Vitest coverage for every compatibility rule (required, not optional)
+- [COMPLETED] `/api/compatibility/check` + text-only build flow UI
+- [COMPLETED] Vitest coverage for every compatibility rule (required, not optional)
 
 ## Phase 4 — 3D Workspace Foundation
 - [TODO] three-d-engine scaffold + R3F canvas + camera controls

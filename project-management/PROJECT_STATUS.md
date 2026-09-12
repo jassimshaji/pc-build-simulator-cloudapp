@@ -1,8 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 3, Milestone 3 COMPLETE (power calculator + PSU checks) —
-next up is Milestone 4 (`/api/compatibility/check` + build flow UI)
-**Overall completion:** ~58%
+**Current phase:** Phase 3 COMPLETE (all 5 milestones) — next up is Phase 4
+(3D Workspace Foundation)
+**Overall completion:** ~62%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -58,16 +58,41 @@ next up is Milestone 4 (`/api/compatibility/check` + build flow UI)
   connector present, PCIe connectors ≥ installed GPU count — `WARNING`, since
   the schema only tracks connector *type* as free text on the GPU/motherboard
   side, not a count to verify against). 24 new tests (14 calculator + 9 rule +
-  1 engine wiring test). **108 tests passing workspace-wide** (up from 84).
+  1 engine wiring test). 108 tests passing workspace-wide.
+- **Phase 3, Milestone 4 — `/api/compatibility/check` + build flow UI:**
+  `apps/web/lib/compatibility.ts` bridges real Prisma `Component` rows (hot
+  columns + `specifications` + a client-supplied quantity) into the engine's
+  plain `BuildComponentInput` shape and calls `runCompatibilityCheck()` —
+  unknown/deleted component ids and not-yet-modeled categories are silently
+  skipped rather than failing the whole check. `POST /api/compatibility/check`
+  (public, read-only) wraps it behind the `{data,error}` envelope. The
+  `/workspace` page's static three-panel shell (Phase 1) is now a real,
+  interactive client component (`build-workspace.tsx`): clickable categories +
+  search query real inventory, clicking a component shows its full
+  specifications and an "Add to build" button, an added-components list with
+  per-line removal, and a live compatibility panel + footer summary
+  (component count / estimated power + recommended PSU wattage / overall
+  status) that re-checks on every selection change. The center 3D placeholder
+  is untouched — that's Phase 4. Slot uniqueness (one CPU, etc.) is
+  deliberately not enforced yet — quantities just accumulate, same as the
+  rules already tolerate.
+- **Phase 3, Milestone 5 — Vitest coverage confirmation:** verified all 15
+  registered rule functions are each referenced by at least one test file (no
+  gaps) — the required-not-optional coverage from the project brief was
+  already satisfied by Milestones 2-3's own tests.
+
+**PHASE 3 IS NOW COMPLETE.** All 5 milestones (scaffold, rules, power
+calculator, check API + build flow UI, coverage confirmation) are done and
+verified — live API tests (compatible build, mismatched socket, empty build,
+unknown id, invalid input) and a Playwright pass through the real `/workspace`
+UI (component picker, spec display incl. nested-object fields, live
+compatibility panel in both OK/ERROR states, mobile-width stacking with no
+horizontal overflow).
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 3, Milestone 4.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 4.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 3: `/api/compatibility/check` + build flow UI (Milestone 4), required
-  Vitest coverage on every rule (Milestone 5 — already satisfied by Milestones
-  2-3's tests; this milestone is really just a final coverage confirmation
-  pass).
 - Phase 4: 3D workspace (R3F canvas, procedural generators, install zones, click-to-place).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
@@ -81,8 +106,7 @@ next up is Milestone 4 (`/api/compatibility/check` + build flow UI)
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 3, Milestone 4: `/api/compatibility/check` +
-build flow UI** — an API route wrapping `runCompatibilityCheck()`, and a
-text-only (no 3D yet) build creation flow that surfaces live
-compatibility/warnings and estimated power. See `SESSION_CHECKPOINT.md` for
-exact resume details.
+Say "Continue" to begin **Phase 4, Milestone 1: `packages/three-d-engine`
+scaffold** — an R3F canvas mounted in the workspace page with camera controls
+(orbit/zoom/pan/reset), replacing the center placeholder box. See
+`SESSION_CHECKPOINT.md` for exact resume details.

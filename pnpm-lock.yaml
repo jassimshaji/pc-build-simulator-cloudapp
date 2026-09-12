@@ -184,6 +184,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1130.0
         version: 3.1130.0
+      '@pcbuilder/compatibility-engine':
+        specifier: workspace:*
+        version: link:../../packages/compatibility-engine
       '@pcbuilder/component-models':
         specifier: workspace:*
         version: link:../../packages/component-models

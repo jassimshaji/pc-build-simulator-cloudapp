@@ -2,6 +2,45 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 3, Milestones 4-5: compatibility check API + build flow UI (Phase 3 complete)
+- `apps/web/lib/compatibility.ts`: bridges real Prisma `Component` rows into
+  the engine's plain `BuildComponentInput` shape and calls
+  `runCompatibilityCheck()`; unknown ids and not-yet-modeled categories are
+  skipped rather than failing the check.
+- `POST /api/compatibility/check` (new, public): Zod-validated
+  `{selections: [{componentId, quantity}]}` in, `CompatibilityReport` out via
+  the standard envelope.
+- `/workspace` is now genuinely interactive: real category browsing + search
+  (was `disabled` placeholders), clicking a component shows its full spec
+  list and an "Add to build" button, an added-components list with removal,
+  and a live compatibility panel + footer summary (component count,
+  estimated power/recommended PSU wattage, overall status) that re-checks on
+  every change. The center 3D placeholder is untouched — that's Phase 4.
+- Fixed a display bug caught via a live Playwright screenshot: nested-object
+  spec fields (e.g. a motherboard's `dimensionsMm: {width, depth}`) rendered
+  as the literal string `[object Object]` — added a `formatSpecValue` helper
+  that formats arrays and nested objects properly.
+- Hit and resolved a new stricter ESLint rule
+  (`react-hooks/set-state-in-effect`) that flags any synchronous `setState`
+  in an effect body — this was the app's first data-fetching-via-`useEffect`
+  component, so no prior precedent existed. Resolved by dropping a stored
+  loading-boolean in favor of a value derived during render, and moving the
+  "clear stale results" reset into the add/remove event handlers instead of
+  the effect.
+- Milestone 5 (required Vitest coverage) was a verification pass: confirmed
+  all 15 registered compatibility rules are each referenced by at least one
+  test — no gaps found, nothing to add.
+- Verified live: a real 6-component compatible build (matching sockets, real
+  RAM/GPU/PSU/case) → `OK` with real power numbers; a mismatched-socket build
+  → `ERROR`; empty build and unknown component id → graceful `200`s;
+  malformed input → `400`. Playwright confirmed both OK/ERROR states
+  render correctly and the layout stacks cleanly at 400px mobile width with
+  no horizontal overflow.
+- Whole-workspace `pnpm typecheck` (10/10), `pnpm build` (6/6), `pnpm test`
+  (108/108), `pnpm --filter web run lint` (clean) all pass.
+- **PHASE 3 (Compatibility Engine & Power Calculation) IS NOW COMPLETE** — all
+  5 milestones done.
+
 ## 2026-09-12 — Phase 3, Milestone 3: power calculator + PSU checks
 - `packages/compatibility-engine/src/powerCalculator.ts`: `estimateSystemPower(build)`
   sums real CPU `tdpWatts`/GPU `powerDrawWatts` and falls back to small,
