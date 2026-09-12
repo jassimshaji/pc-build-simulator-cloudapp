@@ -1,4 +1,16 @@
-// Placeholder entry point. Zod schemas per component category (CPU, GPU, RAM,
-// Motherboard, Case, PSU, Cooling, Monitor, ...) land here in Phase 2, Milestone 1
-// (see project-management/DEVELOPMENT_ROADMAP.md and ARCHITECTURE.md §5).
-export {};
+export * from "./types";
+export * from "./registry";
+
+export * from "./categories/cpu";
+export * from "./categories/motherboard";
+export * from "./categories/gpu";
+export * from "./categories/ram";
+export * from "./categories/ssd";
+export * from "./categories/psu";
+export * from "./categories/case";
+export * from "./categories/airCooler";
+export * from "./categories/aioCooler";
+export * from "./categories/fan";
+export * from "./categories/monitor";
+export * from "./categories/caseLcd";
+export * from "./categories/generic";

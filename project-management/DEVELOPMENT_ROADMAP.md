@@ -73,9 +73,14 @@ Milestones (each independently shippable):
 ---
 
 ## PHASE 2 — Component Inventory System
-1. `[ ]` `packages/component-models`: Zod schemas for all 13+ category spec shapes
+1. `[x]` `packages/component-models`: Zod schemas for all 13+ category spec shapes
    (Motherboard, CPU, GPU, RAM, SSD, PSU, Case, Fan, AIO, Air Cooler, Monitor, Case
-   LCD, generic/future) + hot-field extraction functions.
+   LCD, generic/future) + hot-field extraction functions. **Done 2026-09-12** — one
+   schema file per category + `src/registry.ts` as the single
+   validate/extract-hot-fields lookup point; hot-field promotion strictly follows
+   the fields documented in ARCHITECTURE.md §4.1 (no new hot columns invented). 34
+   Vitest tests (schema valid/invalid cases + registry fallback/extraction) all
+   pass; full workspace typecheck/build/test all green.
 2. `[ ]` Admin inventory dashboard: list/search components, low-stock/out-of-stock
    views, recently-updated view.
 3. `[ ]` Admin CRUD: create/edit/delete component, per-category dynamic spec form

@@ -2,6 +2,27 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 2, Milestone 1: Component data models
+- Added Zod schemas for all 12 seeded component categories (CPU, Motherboard, GPU,
+  RAM, SSD, PSU, Case, Air Cooler, AIO Cooler, Fan, Monitor, Case LCD) plus a
+  permissive generic fallback schema for future categories, in `packages/component-models`.
+- Added `src/registry.ts` as the single `validateSpecifications`/`extractHotFields`
+  lookup point, mapping category keys to their schema and hot-field extractor.
+  Hot-field promotion strictly follows what ARCHITECTURE.md §4.1 already documented
+  — no new hot columns invented; categories/fields that don't fit the
+  equality/range-check model (cooler socket lists, AIO radiator size, fan
+  size/mount, monitor specs) are deliberately left in the JSONB `specifications`
+  blob only, each with an inline comment explaining why.
+- Bumped this package's `zod` from the Milestone-1 stub `^3.24.1` to `^4.6.2` to
+  match `apps/web`.
+- Wrote the project's first real test suite: 34 Vitest tests (25 schema
+  valid/invalid cases, 9 registry tests) — all passing. Added a
+  `tsconfig.typecheck.json` pattern so `pnpm typecheck` also covers test files
+  without polluting the package's actual build output.
+- Full workspace `pnpm typecheck`/`build`/`test` all pass. Stopped at the Phase 2 /
+  Milestone 1 checkpoint; the admin inventory dashboard (Milestone 2) is next,
+  pending user "Continue".
+
 ## 2026-09-12 — Phase 1, Milestone 5: Components API (Phase 1 complete)
 - Added `packages/shared`'s `apiSuccess`/`apiError` response envelope (this package
   was an empty stub until now); retrofitted the register route onto it too.

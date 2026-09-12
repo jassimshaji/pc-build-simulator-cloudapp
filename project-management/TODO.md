@@ -23,7 +23,7 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] `/api/components` list/search/filter/get-by-id backed by real data
 
 ## Phase 2 — Component Inventory System
-- [TODO] Zod schemas for all component category spec shapes
+- [COMPLETED] Zod schemas for all component category spec shapes
 - [TODO] Admin inventory dashboard (overview, low/out-of-stock, recently updated)
 - [TODO] Admin CRUD for components (dynamic per-category spec form, image upload)
 - [TODO] Stock management + brand/category management screens

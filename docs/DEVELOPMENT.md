@@ -52,10 +52,15 @@ non-auth API routes exist yet — that's Phase 1, Milestone 5).
 
 ## Testing strategy
 
-- **Unit tests (Vitest):** `packages/compatibility-engine` (every rule must have a
-  test — required by project standards, not optional), `packages/component-models`
-  (Zod schema validation), `packages/three-d-engine` (procedural generator output
-  dimensions).
+- **Unit tests (Vitest):** `packages/component-models` — implemented (Phase 2,
+  Milestone 1): 34 tests across `tests/categories.test.ts` (every category schema,
+  valid + invalid cases) and `tests/registry.test.ts` (fallback to the generic
+  schema, hot-field extraction per category). Run with
+  `pnpm --filter @pcbuilder/component-models test`, or `pnpm test` from the root to
+  run every workspace package's tests via Turborepo.
+  `packages/compatibility-engine` (every rule must have a test — required by project
+  standards, not optional, still pending — Phase 3) and `packages/three-d-engine`
+  (procedural generator output dimensions, still pending — Phase 4) are next.
 - **Integration/API tests (Vitest):** API route handlers against a test database.
 - **Critical UI tests (Playwright, later phase):** register/login, add component to
   build, compatibility warning appears, save/load a build.
