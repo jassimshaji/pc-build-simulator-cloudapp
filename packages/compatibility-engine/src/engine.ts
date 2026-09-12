@@ -1,15 +1,10 @@
-import type {
-  CompatibilityCheckInput,
-  CompatibilityReport,
-  CompatibilityResult,
-  CompatibilityRule,
-} from "./types";
+import type { CompatibilityCheckInput, CompatibilityReport, CompatibilityResult } from "./types";
+import { ALL_RULES } from "./rules";
 
-// Populated in Milestone 2 (CPU↔socket, RAM↔motherboard, GPU↔case clearance,
-// case↔form factor, cooling↔socket/mount, storage interface). Each rule lives in
-// its own file under rules/ and gets pushed onto this list — engine.ts itself
-// should not need to change shape as rules are added, only this list.
-const RULES: CompatibilityRule[] = [];
+// CPU↔socket, RAM↔motherboard, GPU↔case clearance, case↔form factor,
+// cooling↔socket/mount, storage interface (Milestone 2). Each rule lives in its
+// own file under rules/ — see rules/index.ts for the registered list.
+const RULES = ALL_RULES;
 
 function aggregateStatus(results: CompatibilityResult[]): CompatibilityReport["overallStatus"] {
   if (results.some((result) => !result.compatible && result.severity === "ERROR")) {

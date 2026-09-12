@@ -2,6 +2,29 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 3, Milestone 2: compatibility rules
+- 13 rule functions across 6 new files under
+  `packages/compatibility-engine/src/rules/`: `cpuSocket` (1 rule),
+  `ramCompatibility` (3: type match, capacity vs. `maxRamGb`, module count vs.
+  `ramSlots`), `gpuClearance` (2: length vs. `maxGpuLengthMm` [ERROR], slot
+  width vs. `pcieSlots` [WARNING — coarse proxy, no slot-spacing field in the
+  schema]), `caseFormFactor` (1, reads the full supported-form-factor array
+  rather than the case's single-value hot column), `coolingCompatibility` (4:
+  air/AIO cooler socket support [ERROR], air cooler height clearance [ERROR],
+  AIO radiator mount [WARNING — matches against free-text case data like
+  `"240mm front"` by substring, so treated as advisory]), `storageInterface` (2:
+  M.2 and SATA port availability, NVMe+SATA M.2 drives sharing one slot pool).
+- All 13 registered in new `rules/index.ts`'s `ALL_RULES`; `engine.ts`'s `RULES`
+  now imports it instead of being hardcoded empty.
+- 50 new Vitest tests (one spec file per rule module, each covering the
+  compatible case, the incompatible case, and at least one not-applicable/`null`
+  case) plus a rewritten `engine.spec.ts` (5 tests, was 2) verifying
+  `overallStatus` aggregation end-to-end.
+- Power fields in the report are still hardcoded `0` — that's Milestone 3
+  (power calculator), not done here.
+- Whole-workspace `pnpm typecheck` (9/9), `pnpm build` (6/6), `pnpm test`
+  (84/84), `pnpm --filter web run lint` (clean) all pass.
+
 ## 2026-09-12 — Phase 3, Milestone 1: compatibility-engine scaffold
 - `packages/compatibility-engine/src/types.ts`: `Severity`, `CompatibilityResult`,
   `CompatibilityReport`, `CompatibilityRule` exactly per ARCHITECTURE.md §6, plus

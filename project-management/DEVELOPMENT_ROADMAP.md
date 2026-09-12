@@ -160,7 +160,7 @@ Milestones (each independently shippable):
 
 ## PHASE 3 — Compatibility Engine & Power Calculation (text-first, no 3D yet)
 1. `[x]` `packages/compatibility-engine` scaffold + `CompatibilityResult`/`Report` types.
-2. `[ ]` Rules: CPU↔socket, RAM↔motherboard, GPU↔case clearance, case↔form factor,
+2. `[x]` Rules: CPU↔socket, RAM↔motherboard, GPU↔case clearance, case↔form factor,
    cooling↔socket/mount, storage interface availability.
 3. `[ ]` Power calculator + PSU wattage/connector check.
 4. `[ ]` `/api/compatibility/check` route + build creation flow (component picker,

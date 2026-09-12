@@ -1,8 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 3, Milestone 1 COMPLETE (engine scaffold) — next up is
-Milestone 2 (compatibility rules)
-**Overall completion:** ~52%
+**Current phase:** Phase 3, Milestone 2 COMPLETE (compatibility rules) — next up is
+Milestone 3 (power calculator)
+**Overall completion:** ~55%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -30,18 +30,31 @@ Milestone 2 (compatibility rules)
   `CompatibilityResult`/`CompatibilityReport`/`CompatibilityRule` types plus
   `BuildComponentInput`/`CompatibilityCheckInput` (the engine's plain-data input
   shape, deliberately independent of Prisma/UI types) exactly matching
-  ARCHITECTURE.md §6. Real `runCompatibilityCheck()` entry point wired to an empty
-  rule list — always returns `OK` with no results and 0 estimated power until
-  Milestones 2-3 add real rules and power calculation. 2 Vitest tests confirm the
-  scaffold's honest empty-state behavior.
+  ARCHITECTURE.md §6. Real `runCompatibilityCheck()` entry point.
+- **Phase 3, Milestone 2 — compatibility rules:** 13 rule functions across 6 files
+  under `packages/compatibility-engine/src/rules/`: `cpuSocket` (1), `ramCompatibility`
+  (3: type match, capacity, module count), `gpuClearance` (2: length clearance,
+  slot width), `caseFormFactor` (1), `coolingCompatibility` (4: air/AIO socket
+  support, air clearance, AIO radiator mount), `storageInterface` (2: M.2/SATA
+  port availability). Each rule returns `null` when its required categories
+  aren't both present, otherwise a `CompatibilityResult` with `INFO` severity
+  when compatible or a rule-specific `ERROR`/`WARNING` when not (softer proxy
+  checks — GPU slot width, AIO radiator mount string-matching — are `WARNING`,
+  hard physical clearances are `ERROR`). All 13 registered in
+  `rules/index.ts`'s `ALL_RULES`, consumed by `engine.ts`. 50 new Vitest tests
+  (one file per rule module) plus 3 new integration tests in `engine.spec.ts`
+  covering status aggregation (OK/WARNING/ERROR) end-to-end — 84 tests passing
+  workspace-wide. Power estimation is still Milestone 3 — reports still show 0
+  watts.
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 3, Milestone 2.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 3, Milestone 3.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 3: compatibility rules (Milestone 2), power calculator (Milestone 3),
+- Phase 3: power calculator (Milestone 3),
   `/api/compatibility/check` + build flow UI (Milestone 4), required Vitest
-  coverage on every rule (Milestone 5).
+  coverage on every rule (Milestone 5, already satisfied by Milestone 2's tests —
+  confirm nothing new needs coverage once Milestone 3's power calculator lands).
 - Phase 4: 3D workspace (R3F canvas, procedural generators, install zones, click-to-place).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
@@ -55,7 +68,8 @@ Milestone 2 (compatibility rules)
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 3, Milestone 2: compatibility rules** (CPU↔socket,
-RAM↔motherboard, GPU↔case clearance, case↔form factor, cooling↔socket/mount,
-storage interface), each with its own Vitest suite. See `SESSION_CHECKPOINT.md` for
-exact resume details.
+Say "Continue" to begin **Phase 3, Milestone 3: power calculator** —
+`estimateSystemPower(build)` summing CPU/GPU/motherboard baseline/RAM/storage/fan
+draw, with a configurable headroom multiplier (default 1.25) producing
+`recommendedPsuWattage`, plus a PSU wattage/connector check rule. See
+`SESSION_CHECKPOINT.md` for exact resume details.
