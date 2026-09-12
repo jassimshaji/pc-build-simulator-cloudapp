@@ -1,8 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 3 COMPLETE (all 5 milestones) — next up is Phase 4
-(3D Workspace Foundation)
-**Overall completion:** ~62%
+**Current phase:** Phase 4, Milestone 1 COMPLETE (three-d-engine scaffold) —
+next up is Milestone 2 (procedural generators for Case/Motherboard/CPU/RAM/GPU/PSU)
+**Overall completion:** ~64%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -89,11 +89,32 @@ UI (component picker, spec display incl. nested-object fields, live
 compatibility panel in both OK/ERROR states, mobile-width stacking with no
 horizontal overflow).
 
+- **Phase 4, Milestone 1 — `packages/three-d-engine` scaffold:** added
+  `three`, `@react-three/fiber`, `@react-three/drei` as real dependencies
+  (react/react-dom as peer deps). `WorkspaceCanvas` component: an R3F
+  `<Canvas>` with lighting, a reference `Grid`, a single placeholder box (only
+  to prove the render pipeline works — replaced by real procedural generators
+  in Milestone 2), and `OrbitControls` (orbit/zoom/pan all via mouse/trackpad
+  by default). Exposes a `WorkspaceCanvasHandle` (`{ resetView }`) via `ref`
+  for the one action that needs an explicit trigger. Consumed by
+  `apps/web/app/workspace/build-workspace.tsx` through `next/dynamic` with
+  `ssr: false` (WebGL needs a browser) — replaces the Phase 1 dashed-border
+  placeholder box and the four `disabled` Orbit/Zoom/Pan/Reset buttons with a
+  real canvas, a real "Reset view" button, and a caption explaining the
+  mouse-driven controls. Verified live via Playwright: a real `<canvas>`
+  element mounts with zero console errors, a mouse-drag actually orbits the
+  camera (confirmed by comparing before/after screenshots), "Reset view"
+  restores the exact initial framing, and the canvas resizes correctly with
+  no horizontal overflow at 400px mobile width.
+
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 4.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 2.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 4: 3D workspace (R3F canvas, procedural generators, install zones, click-to-place).
+- Phase 4: procedural generators (Milestone 2), installation zone system
+  (Milestone 3), click-to-place wired to the compatibility engine (Milestone
+  4), remaining procedural generators (Milestone 5), GLTF asset loading
+  (Milestone 6).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
 
@@ -106,7 +127,6 @@ horizontal overflow).
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 4, Milestone 1: `packages/three-d-engine`
-scaffold** — an R3F canvas mounted in the workspace page with camera controls
-(orbit/zoom/pan/reset), replacing the center placeholder box. See
-`SESSION_CHECKPOINT.md` for exact resume details.
+Say "Continue" to begin **Phase 4, Milestone 2: procedural generators** for
+Case, Motherboard, CPU, RAM, GPU, and PSU — the components needed for a
+minimal end-to-end build. See `SESSION_CHECKPOINT.md` for exact resume details.

@@ -1,7 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import type { CompatibilityReport } from "@pcbuilder/compatibility-engine";
+import type { WorkspaceCanvasHandle } from "@pcbuilder/three-d-engine";
+
+// WebGL needs a browser — @react-three/fiber's Canvas can't render on the
+// server, so it's loaded client-only rather than through the normal static
+// import every other component here uses.
+const WorkspaceCanvas = dynamic(
+  () => import("@pcbuilder/three-d-engine").then((mod) => mod.WorkspaceCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full w-full items-center justify-center text-sm text-zinc-600">
+        Loading 3D scene...
+      </div>
+    ),
+  },
+);
 
 interface Category {
   id: string;
@@ -57,6 +74,7 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
   const [selected, setSelected] = useState<ComponentSummary | null>(null);
   const [buildLines, setBuildLines] = useState<BuildLine[]>([]);
   const [report, setReport] = useState<CompatibilityReport | null>(null);
+  const canvasRef = useRef<WorkspaceCanvasHandle>(null);
 
   // Derived, not stored: true whenever the build has components but the check
   // for the current selection hasn't resolved yet (handleAdd/handleRemove
@@ -187,22 +205,18 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
         </aside>
 
         {/* 3D workspace */}
-        <main className="flex min-h-[16rem] flex-1 flex-col items-center justify-center gap-3 border-b border-zinc-800 p-6 lg:min-h-0 lg:border-b-0 lg:border-r">
-          <div className="flex h-full w-full max-w-2xl items-center justify-center rounded border border-dashed border-zinc-700 text-center text-sm text-zinc-600">
-            3D workspace — lands in Phase 4
+        <main className="flex min-h-[16rem] flex-1 flex-col gap-2 border-b border-zinc-800 p-3 lg:min-h-0 lg:border-b-0 lg:border-r">
+          <div className="min-h-0 flex-1 overflow-hidden rounded border border-zinc-800">
+            <WorkspaceCanvas ref={canvasRef} />
           </div>
-          <div className="flex gap-2 text-xs text-zinc-500">
-            <button type="button" disabled className="rounded border border-zinc-800 px-2 py-1">
-              Orbit
-            </button>
-            <button type="button" disabled className="rounded border border-zinc-800 px-2 py-1">
-              Zoom
-            </button>
-            <button type="button" disabled className="rounded border border-zinc-800 px-2 py-1">
-              Pan
-            </button>
-            <button type="button" disabled className="rounded border border-zinc-800 px-2 py-1">
-              Reset
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <span>Drag to orbit · Scroll to zoom · Right-click drag to pan</span>
+            <button
+              type="button"
+              onClick={() => canvasRef.current?.resetView()}
+              className="rounded border border-zinc-800 px-2 py-1 hover:bg-zinc-900"
+            >
+              Reset view
             </button>
           </div>
         </main>

@@ -2,6 +2,29 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 4, Milestone 1: three-d-engine scaffold
+- `packages/three-d-engine` gains real dependencies: `three`,
+  `@react-three/fiber` (v9, React 19-compatible), `@react-three/drei`
+  (`react`/`react-dom` as peer deps so the package doesn't bundle its own
+  React copy).
+- New `WorkspaceCanvas` component: an R3F `<Canvas>` with lighting, a
+  reference grid, a placeholder box (proves the render pipeline works —
+  replaced by real procedural generators in Milestone 2), and `OrbitControls`
+  (orbit/zoom/pan all handled natively via mouse/trackpad). Exposes a
+  `WorkspaceCanvasHandle` (`{ resetView }`) via `ref` for the one camera
+  action that needs an explicit trigger.
+- `apps/web/app/workspace/build-workspace.tsx`: the Phase 1 placeholder
+  center pane (dashed box + four disabled buttons) is now the real
+  `WorkspaceCanvas` (loaded via `next/dynamic({ ssr: false })`, since WebGL
+  needs a browser) plus one working "Reset view" button and a caption
+  explaining the mouse-driven controls.
+- Verified live via Playwright against the actual running dev server: a real
+  `<canvas>` mounts with zero console errors, a simulated mouse-drag visibly
+  orbits the camera, "Reset view" restores the exact initial framing, and the
+  canvas renders correctly with no horizontal overflow at 400px mobile width.
+- Whole-workspace `pnpm typecheck` (11/11), `pnpm build` (6/6), `pnpm test`
+  (108/108, unchanged), `pnpm --filter web run lint` (clean) all pass.
+
 ## 2026-09-12 — Phase 3, Milestones 4-5: compatibility check API + build flow UI (Phase 3 complete)
 - `apps/web/lib/compatibility.ts`: bridges real Prisma `Component` rows into
   the engine's plain `BuildComponentInput` shape and calls

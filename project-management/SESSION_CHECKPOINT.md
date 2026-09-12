@@ -1,153 +1,134 @@
 SESSION DATE: 2026-09-12
 
-CURRENT PHASE: Phase 3 COMPLETE (all 5 milestones). Next: Phase 4 — 3D
-Workspace Foundation.
+CURRENT PHASE: Phase 4, Milestone 1 COMPLETE. Next: Milestone 2 — procedural
+generators (Case, Motherboard, CPU, RAM, GPU, PSU).
 
 CURRENT TASK: None in progress — awaiting user instruction for Phase 4,
-Milestone 1 (`packages/three-d-engine` scaffold + R3F canvas + camera controls).
+Milestone 2.
 
-LAST COMPLETED STEP: Phase 3, Milestones 4-5 (`/api/compatibility/check` +
-build flow UI, and Vitest coverage confirmation) — the final two milestones of
-Phase 3, done in the same session as Milestone 3 (power calculator, previous
-checkpoint).
+LAST COMPLETED STEP: Phase 4, Milestone 1 (`packages/three-d-engine` scaffold),
+verified via typecheck/build/lint and a live Playwright pass against the
+actual rendered WebGL canvas.
 
-- `apps/web/lib/compatibility.ts` (new): `checkBuildCompatibility(selections)`
-  — the bridge between real Prisma `Component` rows and the engine's plain
-  `BuildComponentInput` shape (ARCHITECTURE.md §6 requires the engine itself
-  stay framework/DB-agnostic, so this mapping lives in `apps/web`, not the
-  package). Looks up components by id, reads their hot columns directly into
-  `hotFields` and `specifications` straight through, applies the
-  client-supplied `quantity`, and calls `runCompatibilityCheck`. Unknown
-  component ids (deleted between fetch and check) and components whose
-  category isn't modeled in the engine yet (e.g. MONITOR, CASE_LCD) are
-  silently skipped rather than failing the whole check.
-- `apps/web/app/api/compatibility/check/route.ts` (new): `POST`, public (no
-  auth — read-only, computed from public catalog data, same trust level as
-  browsing components). Zod-validates `{ selections: [{componentId, quantity}] }`,
-  delegates to `lib/compatibility.ts`, returns the `CompatibilityReport` via
-  the standard `{data,error}` envelope.
-- `apps/web/app/workspace/page.tsx`: now a thin server component (fetches
-  categories, hands off to the client component) instead of rendering the
-  static Phase 1 placeholder shell directly.
-- `apps/web/app/workspace/build-workspace.tsx` (new, `"use client"`): the real
-  interactive picker. Category buttons are now real (were `disabled`) and
-  drive a live `/api/components?category=...&q=...` fetch; the search box is
-  wired to the same query. Clicking a component shows its full
-  `specifications` (a `formatSpecValue` helper handles arrays and nested
-  objects like a motherboard's `dimensionsMm: {width, depth}` — plain
-  `String()` would have printed `[object Object]`, caught via a live
-  Playwright screenshot and fixed) plus an "Add to build" button. Added lines
-  show in a "Your build" list with per-line removal. Every build change
-  re-POSTs to `/api/compatibility/check` and renders the live results list
-  (severity-colored badges: INFO green, WARNING amber, ERROR red) and updates
-  the footer's component count / estimated power + recommended PSU wattage /
-  overall status. The center 3D placeholder box and camera control buttons are
-  untouched (still Phase 4). Deliberately does NOT enforce slot uniqueness (one
-  CPU, etc.) yet — quantities just accumulate per componentId, matching how
-  the compatibility rules already tolerate multiples; real enforcement is a
-  Phase 4/5 concern once there's an actual 3D zone to place into.
-- Hit and fixed a new ESLint rule (`react-hooks`'s `set-state-in-effect`,
-  apparently new/stricter in whatever version ships with `eslint-config-next
-  16.3.4` — this is the app's first data-fetching-via-`useEffect` component,
-  so no prior precedent existed) that flags ANY synchronous `setState` call in
-  an effect body, including the common "set loading=true, then fetch" pattern.
-  Resolved by dropping the separate loading-boolean state entirely: removed
-  `isLoadingComponents`, and replaced `isCheckingCompatibility` with a value
-  *derived* during render (`buildLines.length > 0 && report === null`) instead
-  of a stored/set boolean — `handleAdd`/`handleRemove` reset `report` to
-  `null` synchronously (an event handler, not an effect, so the rule doesn't
-  apply), which both clears stale results immediately and makes the derived
-  "checking" flag correct.
-- `apps/web/package.json`: added `@pcbuilder/compatibility-engine` as a
+- `packages/three-d-engine/package.json`: added real dependencies — `three`
+  (^0.186.0), `@react-three/fiber` (^9.7.0, requires React 19 — matches
+  `apps/web`'s React 19.2.8), `@react-three/drei` (^10.7.8). `react`/
+  `react-dom` added as `devDependencies` (for local typechecking) AND
+  `peerDependencies` (so the package doesn't bundle its own React copy — it's
+  consumed by `apps/web`'s single React tree). `@types/three` added as a dev
+  dependency.
+- `packages/three-d-engine/src/WorkspaceCanvas.tsx` (new): `"use client"`
+  component exporting `WorkspaceCanvas` — an R3F `<Canvas>` with a dark
+  background color, ambient + directional lighting, a `Grid` (drei) for
+  spatial reference, a single gray placeholder box (only to prove the render
+  pipeline actually works — Milestone 2's real procedural generators replace
+  it), and `OrbitControls` (drei) which handles orbit/zoom/pan natively via
+  mouse drag / scroll / right-click-drag — no custom code needed for those
+  three. Exposes a `WorkspaceCanvasHandle` (`{ resetView: () => void }`) via
+  `forwardRef`/`useImperativeHandle`, calling the underlying
+  `OrbitControls.reset()` — the one camera action that genuinely needs an
+  explicit trigger rather than continuous mouse input.
+- `packages/three-d-engine/src/index.ts`: now exports `WorkspaceCanvas` +
+  `WorkspaceCanvasHandle` (was `export {}`).
+- `apps/web/package.json`: added `@pcbuilder/three-d-engine` as a workspace
   dependency (first consumer outside the package itself).
-- Milestone 5 (Vitest coverage) was a verification pass, not new code: grepped
-  every one of the 15 registered rule function names against
-  `packages/compatibility-engine/tests/` and confirmed each is referenced by
-  at least one test file — no gaps, nothing to add.
+- `apps/web/app/workspace/build-workspace.tsx`: replaced the Phase 1 static
+  center pane (a dashed-border div + four `disabled` Orbit/Zoom/Pan/Reset
+  buttons) with the real `WorkspaceCanvas`, loaded via `next/dynamic(...,
+  { ssr: false })` since `@react-three/fiber`'s `Canvas` needs a browser/WebGL
+  context and can't render on the server — shows a "Loading 3D scene..."
+  fallback until the client bundle loads. A `canvasRef` (typed
+  `WorkspaceCanvasHandle`) is wired to a real "Reset view" button; a caption
+  ("Drag to orbit · Scroll to zoom · Right-click drag to pan") explains the
+  mouse-driven controls in place of the old fake Orbit/Zoom/Pan buttons (which
+  didn't map cleanly onto how `OrbitControls` actually works — it handles all
+  three simultaneously via different mouse inputs, not as discrete toggled
+  modes).
 
-**Verification — typecheck/build/lint, then live API calls, then a full
-Playwright pass through the real UI:**
-- `pnpm --filter web run typecheck` / `lint` — clean (after the
-  `set-state-in-effect` fix above).
-- `pnpm typecheck` (whole workspace) — 10/10 tasks pass (up from 9 — the new
-  `web:typecheck` picked up the compatibility-engine dependency).
-- `pnpm build` (whole workspace) — 6/6 pass; `/api/compatibility/check` shows
-  up in the route list; only the pre-existing cosmetic Turbopack
-  `@prisma/client` warning (unchanged).
-- `pnpm test` (whole workspace) — 108/108 pass (unchanged from Milestone 3 —
-  this milestone added no new package-level tests, only the coverage
-  confirmation above).
-- Live API test script (`fetch` against the running dev server): a real
-  compatible 6-component build (matching AM5 CPU+motherboard, RAM, GPU, PSU,
-  case) → `OK` with all 9 applicable rule results as `INFO`, real
-  `estimatedPowerWatts`/`recommendedPsuWattage`; a deliberately mismatched CPU
-  socket → `ERROR`; an empty build and an unknown component id → both `200`
-  with an empty/zero report (graceful, not an error); malformed input (missing
-  `componentId`) → `400` with Zod issue details.
-- Playwright pass on `/workspace`: picked a category, searched, selected a
-  component (saw its full spec list, including the nested-object field that
-  needed the `formatSpecValue` fix), added it, added a second matching
-  component, confirmed the compatibility panel showed the real `INFO` result
-  and the footer showed real power/OK status; then built a mismatched pair and
-  confirmed the ERROR badge/message and footer's `Compatibility: ERROR`;
-  confirmed no horizontal overflow and correct stacking at 400px mobile width.
+**Verification:**
+- `pnpm --filter @pcbuilder/three-d-engine run typecheck` — exit 0.
+- `pnpm --filter web run typecheck` / `lint` — clean.
+- `pnpm typecheck` (whole workspace) — 11/11 tasks pass (up from 10 — the new
+  package's own typecheck task).
+- `pnpm build` (whole workspace) — 6/6 pass; only the pre-existing cosmetic
+  Turbopack `@prisma/client` warning (unchanged).
+- `pnpm test` (whole workspace) — 108/108 pass, unchanged (this milestone adds
+  no new package-level tests — R3F scene code is verified live/visually, same
+  approach used for Phase 2's admin UI and Phase 3's build-flow UI milestones,
+  not via Vitest).
+- Live Playwright pass against the actual running dev server (fresh restart
+  after adding the new dependencies, since Turbopack HMR doesn't reliably pick
+  up brand-new node_modules packages): confirmed exactly one real `<canvas>`
+  element mounts in the center pane with zero console/page errors; captured a
+  screenshot, then simulated a mouse-drag across the canvas and captured
+  another screenshot showing the camera genuinely orbited (grid/cube framing
+  visibly different); clicked "Reset view" and confirmed the resulting
+  screenshot is pixel-for-pixel the same framing as the very first screenshot;
+  confirmed no horizontal overflow and the canvas still renders (1 canvas
+  element) at 400px mobile width.
 
 FILES CREATED:
-- apps/web/lib/compatibility.ts
-- apps/web/app/api/compatibility/check/route.ts
-- apps/web/app/workspace/build-workspace.tsx
+- packages/three-d-engine/src/WorkspaceCanvas.tsx
 
 FILES MODIFIED:
-- apps/web/app/workspace/page.tsx (thin server component, hands off to the
-  new client component)
-- apps/web/package.json (added @pcbuilder/compatibility-engine dependency)
+- packages/three-d-engine/package.json (real three/fiber/drei deps, react
+  peer deps)
+- packages/three-d-engine/src/index.ts (real exports)
+- packages/three-d-engine/README.md
+- apps/web/package.json (added @pcbuilder/three-d-engine dependency)
+- apps/web/app/workspace/build-workspace.tsx (real WorkspaceCanvas + Reset
+  view button, replacing the static placeholder)
 - project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
   project-management/PROJECT_STATUS.md, project-management/CURRENT_PHASE.md,
-  project-management/CHANGELOG.md, README.md,
-  packages/compatibility-engine/README.md (this checkpoint's sibling docs)
+  project-management/CHANGELOG.md (this checkpoint's sibling docs)
 
 DATABASE CHANGES: none.
 
-API CHANGES: `POST /api/compatibility/check` (new, public).
+API CHANGES: none.
 
-FRONTEND CHANGES: `/workspace` is now genuinely interactive (was a static
-Phase 1 placeholder shell) — real category browsing/search, component
-add/remove, live compatibility + power feedback. Center 3D pane and camera
-buttons still placeholders (Phase 4).
+FRONTEND CHANGES: `/workspace`'s center pane now renders a real, orbitable 3D
+scene instead of a static placeholder box; the four fake Orbit/Zoom/Pan/Reset
+buttons became one real "Reset view" button plus an instructional caption.
 
-COMPATIBILITY ENGINE CHANGES: none to the package itself this session (already
-done in the Milestone 3 checkpoint) — this session only consumed it from
-`apps/web` for the first time.
+3D ENGINE CHANGES: `packages/three-d-engine` is no longer an empty stub — it
+has a real, working R3F canvas + camera rig. No procedural component models or
+installation zones yet (Milestones 2-3).
 
 KNOWN ISSUES: none new. (Carried over, unchanged: orphaned storage objects on
 component delete; the cosmetic Turbopack `export *` build warning; build slot
-uniqueness not enforced yet — deferred to Phase 4/5 as noted above.)
+uniqueness not enforced in the Phase 3 build flow UI yet — still deferred to
+when there's an actual 3D zone to place into, i.e. this phase's later
+milestones.)
 
-TEST STATUS: 108/108 passing workspace-wide, unchanged from the Milestone 3
-checkpoint (Milestones 4-5 were verified live/via audit, not new package
-tests — appropriate for UI/API wiring work, matching the pattern used for
-Phase 2's admin UI milestones).
-
-**PHASE 3 IS NOW COMPLETE.** All 5 milestones (scaffold, rules, power
-calculator, check API + build flow UI, coverage confirmation) done and
-verified.
+TEST STATUS: 108/108 passing workspace-wide, unchanged (this milestone was
+verified live/visually, appropriately for rendering code — no new Vitest
+tests were needed or added).
 
 NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md
 + CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes
-and Postgres is running, then start PHASE 4 — 3D Workspace Foundation,
-Milestone 1: `packages/three-d-engine` scaffold. Per ARCHITECTURE.md §7: an R3F
-(`@react-three/fiber` + `@react-three/drei`) canvas mounted in
-`apps/web/app/workspace/build-workspace.tsx`'s center pane (currently the
-dashed-border placeholder box), with working camera controls (the Orbit/Zoom/
-Pan/Reset buttons are currently `disabled` — either wire them to
-`OrbitControls`' imperative API or replace them with drei's built-in gizmo,
-whichever reads cleaner). No procedural component models or installation zones
-yet — those are Milestones 2-3. Add `three`, `@react-three/fiber`,
-`@react-three/drei` to `apps/web`'s dependencies and set up
-`packages/three-d-engine`'s actual package.json/tsconfig (currently likely
-still an empty stub — confirm by reading it first). Stop at the scaffold
-checkpoint (a working, empty, orbit-able 3D canvas) rather than also starting
-Milestone 2's procedural generators in the same session.
+and Postgres is running, then start PHASE 4, MILESTONE 2 — procedural
+generators for Case, Motherboard, CPU, RAM, GPU, PSU (the categories needed
+for a minimal end-to-end build per the MVP definition in
+`DEVELOPMENT_ROADMAP.md`). Each generator should be a pure function (e.g.
+`createGenericCPU(spec: CpuSpec): THREE.Group` or an R3F component
+equivalent) living in `packages/three-d-engine/src/generators/`, keyed to
+match the `proceduralGeneratorKey` values already used in
+`apps/web/lib/threeDAssets.ts`'s `PROCEDURAL_GENERATORS` list
+(`createGenericCPU`, `createGenericMotherboard`, `createGenericGPU`,
+`createGenericRAM`, `createGenericPSU`, `createGenericCase`) so seeded
+`ThreeDAsset` rows already pointing at these names resolve to something real.
+Keep each generator's geometry simple (boxes/cylinders with roughly
+correct proportions and a distinct color per category — this is explicitly
+NOT meant to be photorealistic, see ADR-004) rather than over-investing in
+visual fidelity this early. Consider whether `WorkspaceCanvas` should grow a
+prop to render an arbitrary list of placed components (even with hardcoded
+positions for now, since the real installation-zone system is Milestone 3) as
+a way to visually prove the generators work end-to-end, or whether a
+standalone test harness/story is enough for this milestone — use judgment,
+but lean toward something that renders inside the real `/workspace` page so
+verification stays consistent with how every other milestone this project has
+been checked. Stop at Milestone 2's checkpoint rather than also starting
+Milestone 3 (installation zones) in the same session.
 
 EXACT COMMANDS TO RUN THE PROJECT LOCALLY:
   pnpm install
@@ -164,20 +145,22 @@ Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 Local Postgres on THIS machine: native Windows service `postgresql-x64-17` on
 localhost:5432, superuser `postgres`/`postgres`, app role `pcbuilder`/`pcbuilder`
 owning database `pcbuilder`. Confirmed running this session. SeaweedFS is NOT
-running (not needed for Phase 3; Phase 4 also shouldn't need it until real
-GLTF asset loading in Milestone 6) — see docs/DEVELOPMENT.md for restart steps
-and its troubleshooting notes if a future session needs it. The dev server was
-left running this session.
+running (not needed for this milestone; Phase 4 Milestone 6 — real GLTF asset
+loading — may need it eventually) — see docs/DEVELOPMENT.md for restart steps.
+The dev server was left running this session (restarted fresh after adding
+the three-d-engine dependencies; a future session can reuse it or restart it
+freely — Turbopack HMR doesn't reliably pick up brand-new node_modules
+packages, so restart after any future dependency additions too).
 
 A GitHub remote exists: `origin` →
 https://github.com/jassimshaji/pc-build-simulator-cloudapp.git (added by the
-user outside this session). Nothing has been pushed there — only a merge
-pulling its `LICENSE` file in, in a prior session. Don't assume push/PR
-workflows are set up without checking with the user first.
+user outside this session, in a prior session). Nothing has been pushed there
+by any session — only a merge pulling its `LICENSE` file in. Don't assume
+push/PR workflows are set up without checking with the user first.
 
-`jassimshaji20@gmail.com` is `ADMIN` in the database (promoted last session).
-A fresh login is required after any future role change for it to take effect,
-since next-auth signs the role into a JWT at login time.
+`jassimshaji20@gmail.com` is `ADMIN` in the database (promoted 2 sessions
+ago). A fresh login is required after any future role change for it to take
+effect, since next-auth signs the role into a JWT at login time.
 
 PATH note (still applies): if `node`/`pnpm`/`npm`/`psql` report "not recognized" in a
 fresh shell, prepend, e.g. in PowerShell:

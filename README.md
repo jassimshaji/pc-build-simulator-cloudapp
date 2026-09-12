@@ -6,10 +6,10 @@ workspace, get live compatibility and power-draw feedback, and save/share builds
 admin dashboard manages the component catalog, stock, and 3D assets.
 
 **Project status:** Phases 0-3 complete (architecture, core app foundation,
-component inventory, compatibility engine + power calculator) — Phase 4 (3D
-Workspace Foundation) is next. See `project-management/PROJECT_STATUS.md` for
-the live status and `project-management/SESSION_CHECKPOINT.md` for exact
-resume instructions.
+component inventory, compatibility engine + power calculator); Phase 4 (3D
+Workspace Foundation) is in progress — the R3F canvas scaffold is done. See
+`project-management/PROJECT_STATUS.md` for the live status and
+`project-management/SESSION_CHECKPOINT.md` for exact resume instructions.
 
 ## Project Overview
 
@@ -83,13 +83,15 @@ complete.** `packages/compatibility-engine` has 15 real compatibility rules
 factor, cooling↔CPU/case, storage interface availability, PSU
 wattage/connectors) plus a power calculator, all running through
 `runCompatibilityCheck()`. The `/workspace` route is now a real, interactive
-text-only build flow: browse/search real components, add them to a build, and
-see live compatibility results and estimated power update via
-`POST /api/compatibility/check` — the center 3D pane is still a placeholder.
-**Phase 3 (Compatibility Engine & Power Calculation) is complete.**
-`packages/database` has a real Prisma schema, migration, and seed data (see
-`docs/DATABASE.md`). `packages/three-d-engine` is still an empty stub pending
-Phase 4. See `project-management/PROJECT_STATUS.md` for live status.
+build flow: browse/search real components, add them to a build, and see live
+compatibility results and estimated power update via
+`POST /api/compatibility/check`. **Phase 3 (Compatibility Engine & Power
+Calculation) is complete.** `packages/database` has a real Prisma schema,
+migration, and seed data (see `docs/DATABASE.md`). `packages/three-d-engine`
+now has a real React Three Fiber canvas (lighting, a reference grid, orbit/
+zoom/pan/reset camera controls) mounted in `/workspace`'s center pane — no
+procedural component models or installation zones yet, those are later Phase
+4 milestones. See `project-management/PROJECT_STATUS.md` for live status.
 
 Setup requires a local PostgreSQL server (`docs/DATABASE.md`), an
 `apps/web/.env.local` (`docs/DEVELOPMENT.md` has the exact steps, including
