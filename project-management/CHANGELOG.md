@@ -2,6 +2,23 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 3, Milestone 1: compatibility-engine scaffold
+- `packages/compatibility-engine/src/types.ts`: `Severity`, `CompatibilityResult`,
+  `CompatibilityReport`, `CompatibilityRule` exactly per ARCHITECTURE.md §6, plus
+  `BuildComponentInput`/`CompatibilityCheckInput` as the engine's plain-data input
+  shape (no Prisma/UI dependency; reuses `@pcbuilder/component-models`'s
+  `CategoryKey`/`HotFields`).
+- `packages/compatibility-engine/src/engine.ts`: real `runCompatibilityCheck()` entry
+  point wired to an empty `RULES` list — always reports `OK`/no results/0 watts
+  until Milestone 2 (rules) and Milestone 3 (power calculator) land.
+- Added a Vitest suite (2 tests) confirming the scaffold's honest empty behavior;
+  added `@pcbuilder/component-models` + `vitest` to the package's `package.json`
+  and a `tsconfig.typecheck.json` matching `component-models`'s pattern.
+- Housekeeping: skimmed `DECISIONS.md` for corruption similar to the ADR-007 issue
+  found last session — confirmed all 9 ADRs are intact and sequential.
+- Whole-workspace `pnpm typecheck` (9/9), `pnpm build` (6/6), `pnpm test` (36/36),
+  `pnpm --filter web run lint` (clean) all pass.
+
 ## 2026-09-12 — Phase 2, Milestone 6: 3D asset manager (Phase 2 complete)
 - Added `PUT /api/components/:id/asset` (upserts a component's `ThreeDAsset`,
   full `PUT` replace semantics, kind-conditional validation) and extended

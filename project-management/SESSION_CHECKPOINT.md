@@ -1,149 +1,103 @@
 SESSION DATE: 2026-09-12
 
-CURRENT PHASE: Phase 2 COMPLETE (all 6 milestones). Next: Phase 3 — Compatibility
-Engine & Power Calculation.
+CURRENT PHASE: Phase 3, Milestone 1 COMPLETE. Next: Milestone 2 — compatibility
+rules.
 
-CURRENT TASK: None in progress — awaiting user instruction for Phase 3, Milestone 1
-(`packages/compatibility-engine` scaffold).
+CURRENT TASK: None in progress — awaiting user instruction for Phase 3, Milestone 2
+(the six compatibility rules + their Vitest suites).
 
-LAST COMPLETED STEP: Phase 2, Milestone 6 (3D asset manager — the final Phase 2
-milestone), fully verified against the live dev server.
+LAST COMPLETED STEP: Phase 3, Milestone 1 (`packages/compatibility-engine`
+scaffold), verified via typecheck/test/build across the whole workspace.
 
-- `apps/web/lib/storage.ts`: added `ALLOWED_MODEL_CONTENT_TYPES` (`model/gltf-binary`,
-  `model/gltf+json`, `application/octet-stream` — the last one because browsers
-  almost never report a real MIME type for `.glb`) and `MAX_MODEL_UPLOAD_BYTES`
-  (50MB, vs. 10MB for images). `buildAssetKey()` now takes a `prefix` param
-  (`"components"` default, `"models"` for 3D assets) so uploaded models land under
-  a `models/` key prefix instead of mixed in with images.
-- `apps/web/app/api/assets/route.ts`: generalized to accept an optional
-  `purpose: "image" | "model"` field (default `"image"`), selecting the matching
-  content-type allowlist and key prefix. Same route now serves both the Milestone
-  3 image-upload flow and this milestone's model-upload flow — no duplicate route.
-- `apps/web/lib/threeDAssets.ts` (new): `PROCEDURAL_GENERATORS` — the 10 generator
-  names ARCHITECTURE.md §7.3 documents (`createGenericCPU`, `createGenericGPU`,
-  etc.) — and `DEFAULT_GENERATOR_BY_CATEGORY` (a suggested default per category
-  key, not enforced). None of these functions exist yet
-  (`packages/three-d-engine` is an empty stub until Phase 4) — recording which
-  generator a component should use is a data decision the admin can make now,
-  same pattern as categories existing before their Zod schema does.
-- `apps/web/app/api/components/[id]/asset/route.ts` (new): `PUT`, role-gated. Zod
-  schema with `.refine()` cross-field checks: `url` required when `kind ===
-  "GLTF_MODEL"`, `proceduralGeneratorKey` required when `kind ===
-  "PROCEDURAL_FALLBACK"`. Upserts — finds the component's existing `ThreeDAsset`
-  (by `componentId`, taking the first if one exists) and updates it, or creates
-  one if none exists. Full `PUT` replace semantics: fields not in the body are
-  cleared (set to `null`), not left alone — confirmed this is what actually
-  happened when testing (switching kinds without re-sending license/attribution
-  cleared them, which is correct for `PUT`, not a bug).
-- `apps/web/app/admin/components/[id]/asset/page.tsx` + `asset-form.tsx` (new):
-  server component fetches the component + its existing `threeDAssets[0]`; client
-  form lets the admin pick `kind` (select), and conditionally shows either a
-  generator dropdown (`PROCEDURAL_FALLBACK`) or a file input wired to the same
-  upload-then-PUT flow as component images, just with `purpose: "model"` and
-  `.glb`/`.gltf` accept filter (`GLTF_MODEL`). Common fields:
-  source/licenseInfo/attribution/usageRights.
-- `apps/web/app/admin/page.tsx`: added a "3D Asset" link next to Edit/Delete in
-  every dashboard table row.
+- `packages/compatibility-engine/src/types.ts` (new): `Severity`, `CompatibilityResult`,
+  `CompatibilityReport`, `CompatibilityRule` exactly matching ARCHITECTURE.md §6.
+  Also `BuildComponentInput` (`componentId`, `categoryKey`, `quantity`, `hotFields`,
+  `specifications`) and `CompatibilityCheckInput` (`{ components: BuildComponentInput[] }`)
+  — the engine's plain-data input shape, framework-agnostic per the architecture's
+  "zero UI/DB dependency" requirement (no Prisma types imported). `categoryKey` and
+  `hotFields` reuse `@pcbuilder/component-models`'s `CategoryKey`/`HotFields` types
+  rather than re-declaring them.
+- `packages/compatibility-engine/src/engine.ts` (new): real `runCompatibilityCheck(build)`
+  entry point. Holds a `RULES: CompatibilityRule[]` list (empty for now — Milestone 2
+  populates it from `rules/*.ts`), maps every rule over the input, filters out
+  `null` (rules that don't apply yet), and aggregates `overallStatus` (`ERROR` if any
+  result is an incompatible `ERROR`, else `WARNING` if any is an incompatible
+  `WARNING`, else `OK`). `estimatedPowerWatts`/`recommendedPsuWattage` are hardcoded
+  to `0` with a comment pointing at Milestone 3 — deliberately not faking a number
+  before the power calculator exists.
+- `packages/compatibility-engine/src/index.ts`: now exports the real types +
+  `runCompatibilityCheck` (was `export {}`).
+- `packages/compatibility-engine/tests/engine.spec.ts` (new): 2 Vitest tests —
+  empty build produces `OK`/no results/0 power, and a populated build still
+  produces `OK`/no results since no rules are registered yet (guards against
+  someone assuming a populated build should already trigger something).
+- `packages/compatibility-engine/package.json`: added `@pcbuilder/component-models`
+  (workspace dependency, for `CategoryKey`/`HotFields`) and `vitest` (devDependency),
+  `test` script now `vitest run` (was a no-op echo).
+- `packages/compatibility-engine/tsconfig.typecheck.json` (new): same pattern as
+  `component-models` — separate tsconfig including `tests/` for typecheck, keeping
+  the build tsconfig's `rootDir` limited to `src/`.
+- `packages/compatibility-engine/README.md`: updated from "package stub only" to
+  describe the actual scaffold and what's next.
+- Did the housekeeping skim flagged at the end of the last session (given the
+  DECISIONS.md corruption found in Phase 2, Milestone 5): confirmed all 9 ADRs in
+  `DECISIONS.md` have intact, sequential headings (ADR-001 through ADR-009, no
+  merged/missing sections). Nothing else found to be drifted.
 
-**Verification — live API test first, then a real GLB-shaped upload, then a
-Playwright UI pass:**
-- Registered + promoted a test admin, found an existing component (Intel CPU) with
-  its seeded `PROCEDURAL_FALLBACK` asset already in place.
-- Requested a model upload URL (`purpose: "model"`), PUT 8 real bytes (a fake
-  `glTF` magic-number header) to it — 200. Confirmed the object is publicly
-  readable afterward (200, exactly 8 bytes back).
-- `PUT` the component's asset to `kind: "GLTF_MODEL"` with that URL plus
-  source/licenseInfo/attribution/usageRights — 200, response reflects everything
-  correctly, and critically the returned `id` was the SAME as the pre-existing
-  seeded asset's id (`seed-asset-CPU-INTEL-13600K`) — confirming upsert, not a
-  duplicate row.
-- Confirmed validation: `PUT` with `kind: "GLTF_MODEL"` and no `url` → 400.
-- Switched back to `kind: "PROCEDURAL_FALLBACK"` with `proceduralGeneratorKey:
-  "createGenericCPU"` — 200, and confirmed via `GET /api/components/:id` that
-  exactly ONE `ThreeDAsset` row still exists for the component (not two) — the
-  same row had been updated twice, not duplicated.
-- Playwright: logged in, navigated to a component's asset page via the new "3D
-  Asset" dashboard link, confirmed the initial state shows `PROCEDURAL_FALLBACK`
-  with the generator dropdown visible, switched the kind selector to
-  `GLTF_MODEL` and confirmed the generator dropdown disappears and the file
-  input appears — screenshotted both states.
-- Cleaned up: reverted the test CPU's asset back to its exact original seeded
-  state (already matched after the PROCEDURAL_FALLBACK switch — no extra revert
-  needed), deleted the test admin user, removed the two throwaway Node/Playwright
-  scripts.
-- **SeaweedFS environment note for future sessions:** hit two real gotchas
-  restarting it this session (documented in `docs/DEVELOPMENT.md`'s
-  troubleshooting section): (1) starting it via `Start-Process -ArgumentList`
-  with the `-s3.config` path as a separate unquoted array element truncates the
-  path at the first space (this machine's profile path has one — `Jassim
-  Shaji`) — fix is one array element with embedded literal quotes around the
-  path; (2) after that failure the process got stuck in an endless raft
-  leader-election retry loop even once restarted correctly, because its
-  persisted single-node state in `-dir` referenced a different self-discovered
-  IP than the one it was being started with — fix was wiping the data directory
-  (safe, it's just local dev object storage) and restarting fresh.
-- `pnpm typecheck` (9/9), `pnpm --filter web run lint` (clean), and `pnpm build`
-  (6/6, 22 routes total including the two new ones) all pass.
+**Verification:**
+- `pnpm --filter @pcbuilder/compatibility-engine run typecheck` — exit 0.
+- `pnpm --filter @pcbuilder/compatibility-engine run test` — 2/2 passing.
+- `pnpm typecheck` (whole workspace) — 9/9 tasks pass.
+- `pnpm build` (whole workspace) — 6/6 tasks pass, only the pre-existing cosmetic
+  Turbopack `@prisma/client` `export *` warning (unchanged, not new).
+- `pnpm test` (whole workspace) — 36/36 tests pass (34 pre-existing in
+  `component-models` + 2 new in `compatibility-engine`).
+- `pnpm --filter web run lint` — clean, exit 0.
 
 FILES CREATED:
-- apps/web/lib/threeDAssets.ts
-- apps/web/app/api/components/[id]/asset/route.ts
-- apps/web/app/admin/components/[id]/asset/page.tsx, asset-form.tsx
+- packages/compatibility-engine/src/types.ts
+- packages/compatibility-engine/src/engine.ts
+- packages/compatibility-engine/tests/engine.spec.ts
+- packages/compatibility-engine/tsconfig.typecheck.json
 
 FILES MODIFIED:
-- apps/web/lib/storage.ts (model content types/size limit, prefix-aware buildAssetKey)
-- apps/web/app/api/assets/route.ts (purpose: "image" | "model")
-- apps/web/app/admin/page.tsx ("3D Asset" link)
-- docs/API.md (documented PUT /api/components/:id/asset, updated POST /api/assets'
-  doc for the purpose field — removed the now-stale duplicate section from
-  Milestone 3), docs/DEVELOPMENT.md (SeaweedFS troubleshooting notes for the two
-  gotchas above), project-management/DEVELOPMENT_ROADMAP.md,
-  project-management/TODO.md, project-management/CURRENT_PHASE.md,
-  project-management/PROJECT_STATUS.md, project-management/CHANGELOG.md (this
-  checkpoint's sibling docs)
+- packages/compatibility-engine/src/index.ts (real exports, was `export {}`)
+- packages/compatibility-engine/package.json (component-models + vitest deps, real test script)
+- packages/compatibility-engine/README.md
+- project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
+  project-management/PROJECT_STATUS.md, project-management/CURRENT_PHASE.md,
+  project-management/CHANGELOG.md (this checkpoint's sibling docs)
 
-DATABASE CHANGES: none to the schema. (One component's `ThreeDAsset` was
-temporarily switched to `GLTF_MODEL` and back to its original
-`PROCEDURAL_FALLBACK` state during testing — ended up byte-for-byte identical to
-where it started.)
+DATABASE CHANGES: none.
 
-API CHANGES: `PUT /api/components/:id/asset` (new); `POST /api/assets` extended
-(backward compatible — `purpose` defaults to `"image"`, so existing image-upload
-callers are unaffected).
+API CHANGES: none — `/api/compatibility/check` is Milestone 4.
 
-FRONTEND CHANGES: `/admin/components/:id/asset` (new page); dashboard tables gained
-a "3D Asset" action link.
+FRONTEND CHANGES: none this milestone (text-only build flow UI is Milestone 4).
 
-3D ENGINE CHANGES: none — `packages/three-d-engine` is still an empty stub. (The
-generator names now recorded per component are forward references to functions
-that land in Phase 4.)
+COMPATIBILITY ENGINE CHANGES: scaffold only, as described above. No rules yet — the
+engine currently reports every build as `OK` with 0 estimated power regardless of
+contents. This is expected and intentional for Milestone 1; do not read anything
+into it passing/not-flagging anything yet.
 
 KNOWN ISSUES: none new. (Carried over, unchanged: orphaned storage objects on
 component delete; the cosmetic Turbopack `export *` build warning.)
 
-TEST STATUS: no new automated tests this session — verified via live API calls, a
-real presigned-upload round trip, and a Playwright UI pass, which is the right
-verification method for this kind of upload/upsert wiring.
-`packages/component-models`'s 34 tests still pass.
-
-**PHASE 2 IS NOW COMPLETE.** All 6 milestones (component-models, admin inventory
-dashboard, admin CRUD + image upload, stock/brand/category management, CSV
-import/export, 3D asset manager) are done and verified.
+TEST STATUS: 36/36 passing workspace-wide (34 component-models + 2 compatibility-engine).
 
 NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md +
 CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes and
-Postgres is running, then start PHASE 3 (Compatibility Engine & Power Calculation),
-Milestone 1: `packages/compatibility-engine` scaffold — `CompatibilityResult`/
-`CompatibilityReport`/`Severity` types per ARCHITECTURE.md §6, and the
-`runCompatibilityCheck()` entry point shape, ahead of writing the actual rules
-(Milestone 2: CPU↔socket, RAM↔motherboard, GPU↔case clearance, case↔form factor,
-cooling↔socket/mount, storage interface) and the power calculator (Milestone 3).
-This phase explicitly requires full Vitest test coverage on every rule — not
-optional, per the project brief — so budget for writing real tests alongside the
-rules, not as an afterthought. Stop at the scaffold checkpoint rather than also
-writing the rules in the same session. Also worth a quick skim of the other
-project-management docs sometime soon, given the DECISIONS.md corruption found and
-fixed this session — confirm nothing else has quietly drifted.
+Postgres is running, then start PHASE 3, MILESTONE 2 — compatibility rules. Create
+`packages/compatibility-engine/src/rules/` with one file per rule (per
+ARCHITECTURE.md §6's file list: `cpuSocket.ts`, `ramCompatibility.ts`,
+`gpuClearance.ts`, `psuPower.ts` — note this one needs Milestone 3's power estimate,
+so may need to land alongside or after it, or use a simpler standalone wattage
+check for now — `caseFormFactor.ts`, `coolingCompatibility.ts`, `storageInterface.ts`),
+register each in `engine.ts`'s `RULES` list, and write a Vitest suite per rule
+covering compatible/incompatible/rule-not-applicable cases (full coverage per rule
+is explicitly required by the project brief, not optional). Consider doing 2-3
+rules per session rather than all six at once, to keep sessions reviewable — use
+judgment based on how the first rule or two go. Stop at a natural milestone
+checkpoint rather than pushing through to Milestone 3 in the same session.
 
 EXACT COMMANDS TO RUN THE PROJECT LOCALLY:
   pnpm install
@@ -159,9 +113,9 @@ Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 
 Local Postgres on THIS machine: native Windows service `postgresql-x64-17` on
 localhost:5432, superuser `postgres`/`postgres`, app role `pcbuilder`/`pcbuilder`
-owning database `pcbuilder`. SeaweedFS is NOT running (stopped at end of session) —
-see docs/DEVELOPMENT.md (including its new troubleshooting notes) to restart it if
-a future session needs image/model upload to work; not needed for Phase 3.
+owning database `pcbuilder`. Confirmed running this session. SeaweedFS is NOT
+running (not needed for Phase 3) — see docs/DEVELOPMENT.md (including its
+troubleshooting notes) to restart it if a future session needs image/model upload.
 
 PATH note (still applies): if `node`/`pnpm`/`npm`/`psql` report "not recognized" in a
 fresh shell, prepend, e.g. in PowerShell:

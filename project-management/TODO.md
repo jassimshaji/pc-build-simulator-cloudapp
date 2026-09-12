@@ -31,7 +31,7 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] 3D asset manager (upload GLTF/GLB, assign procedural fallback, license metadata)
 
 ## Phase 3 — Compatibility Engine & Power Calculation
-- [TODO] Engine scaffold + result/report types
+- [COMPLETED] Engine scaffold + result/report types
 - [TODO] Rules: CPU socket, RAM, GPU clearance, case form factor, cooling, storage interface
 - [TODO] Power calculator + PSU wattage/connector checks
 - [TODO] `/api/compatibility/check` + text-only build flow UI

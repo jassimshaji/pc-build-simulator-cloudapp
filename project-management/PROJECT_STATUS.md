@@ -1,7 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 2 COMPLETE — next up is Phase 3 (Compatibility Engine & Power Calculation)
-**Overall completion:** ~50%
+**Current phase:** Phase 3, Milestone 1 COMPLETE (engine scaffold) — next up is
+Milestone 2 (compatibility rules)
+**Overall completion:** ~52%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -25,12 +26,22 @@
      duplicate asset rows), kind-specific validation, and the form's conditional
      fields via Playwright.
 
+- **Phase 3, Milestone 1 — `packages/compatibility-engine` scaffold:**
+  `CompatibilityResult`/`CompatibilityReport`/`CompatibilityRule` types plus
+  `BuildComponentInput`/`CompatibilityCheckInput` (the engine's plain-data input
+  shape, deliberately independent of Prisma/UI types) exactly matching
+  ARCHITECTURE.md §6. Real `runCompatibilityCheck()` entry point wired to an empty
+  rule list — always returns `OK` with no results and 0 estimated power until
+  Milestones 2-3 add real rules and power calculation. 2 Vitest tests confirm the
+  scaffold's honest empty-state behavior.
+
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 3.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 3, Milestone 2.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 3: compatibility engine (scaffold, rules, power calculator) + required
-  Vitest coverage on every rule.
+- Phase 3: compatibility rules (Milestone 2), power calculator (Milestone 3),
+  `/api/compatibility/check` + build flow UI (Milestone 4), required Vitest
+  coverage on every rule (Milestone 5).
 - Phase 4: 3D workspace (R3F canvas, procedural generators, install zones, click-to-place).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
@@ -44,7 +55,7 @@
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 3, Milestone 1: `packages/compatibility-engine`
-scaffold** — types + the engine entry point, ahead of the actual rules (Milestone 2)
-and power calculator (Milestone 3). See `SESSION_CHECKPOINT.md` for exact resume
-details.
+Say "Continue" to begin **Phase 3, Milestone 2: compatibility rules** (CPU↔socket,
+RAM↔motherboard, GPU↔case clearance, case↔form factor, cooling↔socket/mount,
+storage interface), each with its own Vitest suite. See `SESSION_CHECKPOINT.md` for
+exact resume details.
