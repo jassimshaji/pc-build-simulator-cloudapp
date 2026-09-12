@@ -2,6 +2,22 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-12 — Phase 2, Milestone 2: Admin inventory dashboard
+- Added `apps/web/lib/inventory.ts` (`getInventoryOverview()`,
+  `searchAllComponents()`) and `GET /api/inventory` (role-gated,
+  `ADMIN`/`INVENTORY_MANAGER`).
+- Rewrote `/admin` from a placeholder into a real dashboard: total/low-stock/
+  out-of-stock stat tiles, a native-form search box, and out-of-stock/low-stock/
+  recently-updated tables. Admin search deliberately includes unavailable
+  components, unlike the public `/api/components`.
+- Verified against the live dev server with real data: temporarily set one seeded
+  component out-of-stock and another low-stock, confirmed the API and rendered
+  dashboard both reflected it correctly, confirmed search works, confirmed the API
+  401s when unauthenticated, then reverted the test changes.
+- Stopped at the Phase 2 / Milestone 2 checkpoint; admin CRUD + image upload
+  (Milestone 3) is next, pending user "Continue". Flagged that no Cloudflare R2
+  bucket exists yet, which Milestone 3's image upload will need to address.
+
 ## 2026-09-12 — Phase 2, Milestone 1: Component data models
 - Added Zod schemas for all 12 seeded component categories (CPU, Motherboard, GPU,
   RAM, SSD, PSU, Case, Air Cooler, AIO Cooler, Fan, Monitor, Case LCD) plus a

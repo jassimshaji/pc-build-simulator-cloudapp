@@ -81,8 +81,17 @@ Milestones (each independently shippable):
    the fields documented in ARCHITECTURE.md §4.1 (no new hot columns invented). 34
    Vitest tests (schema valid/invalid cases + registry fallback/extraction) all
    pass; full workspace typecheck/build/test all green.
-2. `[ ]` Admin inventory dashboard: list/search components, low-stock/out-of-stock
-   views, recently-updated view.
+2. `[x]` Admin inventory dashboard: list/search components, low-stock/out-of-stock
+   views, recently-updated view. **Done 2026-09-12** — `apps/web/lib/inventory.ts`
+   (`getInventoryOverview()`, `searchAllComponents()`), `GET /api/inventory`
+   (role-gated), and a rewritten `/admin` page (stat tiles, native-form search
+   admins can see ALL components including unavailable ones — unlike the public
+   `/api/components`, three-panel-consistent dark styling). Verified against the
+   live dev server with real data: temporarily set one seeded component
+   out-of-stock and another low-stock, confirmed both the API response and the
+   rendered dashboard HTML reflected them correctly, confirmed search-by-model
+   works, confirmed `/api/inventory` 401s when unauthenticated, then reverted the
+   test stock changes.
 3. `[ ]` Admin CRUD: create/edit/delete component, per-category dynamic spec form
    generated from the Zod schema, image upload to R2.
 4. `[ ]` Stock management: update quantity, mark unavailable, brand/category

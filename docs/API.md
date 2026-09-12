@@ -49,6 +49,16 @@ Public. Returns one `Component` with `category`, `brand`, `inventory`, and
 `threeDAssets` included. `404` (`{ data: null, error: { message: "Component not
 found." } }`) if the id doesn't exist.
 
+### `GET /api/inventory`
+`ADMIN`/`INVENTORY_MANAGER` only (`401` if unauthenticated, `403` for a `USER`
+session — via `requireRole`). Returns
+`{ data: { totalComponents, outOfStockComponents, lowStockComponents,
+recentlyUpdatedComponents }, error: null }`, each `*Components` array a flattened
+row (`id, model, sku, categoryLabel, brandName, isAvailable, stockQuantity,
+lowStockThreshold, updatedAt`) rather than the raw Prisma relations. Powers the
+`/admin` dashboard (`apps/web/lib/inventory.ts`'s `getInventoryOverview()`, called
+directly by both the page and this route to avoid duplicating the query logic).
+
 ### Route protection
 - `apps/web/proxy.ts` (Next.js 16's renamed `middleware.ts` convention) gates
   `/admin/:path*`, redirecting to `/` unless the session's JWT role is `ADMIN` or
@@ -63,7 +73,6 @@ found." } }`) if the id doesn't exist.
 |---|---|---|---|
 | `/api/components` | POST | Create component | ADMIN, INVENTORY_MANAGER |
 | `/api/components/:id` | PATCH/DELETE | Edit/delete component | ADMIN, INVENTORY_MANAGER |
-| `/api/inventory` | GET | Stock overview (low/out-of-stock, recent) | ADMIN, INVENTORY_MANAGER |
 | `/api/inventory/update` | POST | Update stock quantity / availability | ADMIN, INVENTORY_MANAGER |
 | `/api/builds` | GET/POST | List/create user builds | USER+ |
 | `/api/builds/:id` | GET/PATCH/DELETE | Load/update/delete a build | owner or ADMIN |

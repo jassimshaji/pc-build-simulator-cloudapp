@@ -1,144 +1,117 @@
 SESSION DATE: 2026-09-12
 
-CURRENT PHASE: Phase 2 — Component Inventory System (Milestone 1 of 6 complete)
+CURRENT PHASE: Phase 2 — Component Inventory System (Milestone 2 of 6 complete)
 
-CURRENT TASK: None in progress — awaiting user instruction for Milestone 2 (admin
-inventory dashboard).
+CURRENT TASK: None in progress — awaiting user instruction for Milestone 3 (admin CRUD).
 
-LAST COMPLETED STEP: Phase 2, Milestone 1 (`packages/component-models`), fully
-implemented and tested — the project's first real (non-placeholder) test suite.
-- Bumped `packages/component-models`'s `zod` dependency from the Milestone-1-stub
-  `^3.24.1` to `^4.6.2` to match what `apps/web` actually installed (avoids two
-  different Zod majors coexisting across packages that will need to share schema
-  instances later, e.g. when the admin dashboard in Milestone 2 imports these
-  schemas into `apps/web`).
-- `src/types.ts`: `CATEGORY_KEYS` (the 12 seeded `ComponentCategory.key` values, kept
-  as a plain string-literal union — category is a data table per ARCHITECTURE.md
-  §4.3, not a TS enum), `CategoryKey`, `isCategoryKey()`, and the `HotFields`
-  interface mirroring the Prisma `Component` model's nullable hot columns.
-  `HotFields` is intentionally sparse — only the fields ARCHITECTURE.md §4.1
-  actually documents (socket, formFactor, ramType, pcieGeneration, lengthMm/
-  widthMm/heightMm, tdpWatts/powerDrawWatts, wattage), nothing invented.
-- One schema file per category under `src/categories/`: `cpu.ts`, `motherboard.ts`,
-  `gpu.ts`, `ram.ts`, `ssd.ts`, `psu.ts`, `case.ts`, `airCooler.ts`, `aioCooler.ts`,
-  `fan.ts`, `monitor.ts`, `caseLcd.ts`, plus `generic.ts` (a permissive
-  `z.record(z.string(), z.unknown())` fallback for future categories — HDD, capture
-  cards, RGB controllers, peripherals, etc. — per the brief's explicit
-  forward-compatibility requirement). Each exports `<name>SpecSchema`, a
-  `z.infer` type, and `extract<Name>HotFields(spec)`.
-- **Deliberate, documented decisions on what NOT to promote to hot columns** (each
-  has an inline comment explaining why, so a future session doesn't "fix" it by
-  adding hot fields that don't fit the equality/range-check model the hot columns
-  exist for):
-  - No `socket` hot field for Air/AIO coolers — a cooler supports a *list* of
-    sockets (`socketCompatibility: string[]`), which doesn't fit the single-value
-    equality check `socket` is for (ARCHITECTURE.md §4.1 documents `socket` only
-    for CPU/Motherboard). Compatibility engine (Phase 3) reads
-    `specifications.socketCompatibility` directly instead.
-  - AIO radiator size (120/240/280/360/420mm) isn't a 3D length/width/height in the
-    GPU/Case sense — it's checked against a case's `radiatorSupport` list, not a
-    numeric range against a hot column. Left entirely in `specifications`.
-  - Fan size/mount, Monitor specs, and Case LCD specs don't map onto any documented
-    hot column at all — their `extract*HotFields` functions return `{}`.
-  - `CASE`'s hot fields: `formFactor` = the first entry of
-    `supportedMotherboardFormFactors` (a case supports a *range*, but the hot
-    column is single-value — used for coarse catalog filtering, NOT the actual
-    compatibility check, which reads the full array from `specifications`).
-    `lengthMm`/`widthMm`/`heightMm` = the case's own EXTERNAL footprint
-    (`dimensionsMm.depth`/`.width`/`.height`), deliberately NOT
-    `maxGpuLengthMm`/`maxCpuCoolerHeightMm` (those are clearance constraints that
-    stay JSONB-only — the compatibility engine reads them off the already-fetched
-    row, they don't need to be indexed columns).
-- `src/registry.ts`: `CATEGORY_REGISTRY` maps every `CategoryKey` to
-  `{ schema, extractHotFields }`. `validateSpecifications(categoryKey, data)` and
-  `extractHotFields(categoryKey, data)` are the two functions everything else
-  (future admin forms, API routes) should call — never switch on category keys
-  directly elsewhere. Unknown category keys fall back to `genericSpecSchema`.
-  **Type-system gotcha hit and fixed:** `CategoryDefinition<Spec = unknown>` used
-  as a heterogeneous map's value type made every concrete `extract<Name>HotFields`
-  function (which only accepts its own narrow Spec type) fail to type-check
-  against `(spec: unknown) => HotFields` — function parameters are contravariant,
-  so a function that only accepts `CpuSpec` cannot satisfy "accepts anything."
-  Fixed by defaulting `Spec = any` instead of `unknown` specifically for this
-  registry map (documented inline as deliberate, not sloppy typing) — each
-  category's own file still keeps its real, precise Spec type; only the
-  registry's map type is intentionally erased.
-- Added a `tsconfig.typecheck.json` (extends the package's own `tsconfig.json`,
-  overrides `rootDir` to `.` and `include` to `["src", "tests"]`) so `pnpm
-  typecheck` also type-checks the test files, while the `build` script's plain
-  `tsconfig.json` (`rootDir: "src"`) stays untouched and only emits `src`'s
-  compiled output to `dist`. This pattern (separate typecheck config once a
-  package gets a `tests/` dir) is worth reusing for `compatibility-engine` and
-  `three-d-engine` when they get real tests in Phases 3-4.
-- `tests/categories.test.ts` (25 tests) and `tests/registry.test.ts` (9 tests):
-  every schema gets at least one valid-input pass and one invalid-input rejection;
-  the registry tests cover the generic-fallback path, hot-field extraction for
-  CPU/GPU/Motherboard/Case (checked against exact expected objects, not just
-  "truthy"), and that a spec failing validation extracts to `{}` rather than
-  throwing.
-- Added `vitest` (`^3.2.4`) as a devDependency; package.json's `test` script is now
-  `vitest run` (previously the Milestone-1 placeholder `echo "no tests yet"`).
-- Verified: `pnpm --filter @pcbuilder/component-models run test` → 34/34 pass.
-  `pnpm typecheck` (root, all 8 package/build tasks) → all pass. `pnpm build`
-  (root, all 6 packages) → all pass, including `web`. `pnpm test` (root) → runs
-  every workspace package's test script via Turborepo; this package's 34 real
-  tests plus the other five packages' still-placeholder `echo` scripts all
-  succeed.
+LAST COMPLETED STEP: Phase 2, Milestone 2 (admin inventory dashboard), fully
+verified against the live dev server with real (temporarily modified) data.
+- `apps/web/lib/inventory.ts` (new): `InventoryRow`/`InventoryOverview` types plus
+  two functions:
+  - `getInventoryOverview()`: total component count (`prisma.component.count()`),
+    out-of-stock (`where: { inventory: { stockQuantity: { lte: 0 } } }` — a plain
+    constant comparison, pushed to the DB), low-stock (narrowed to in-stock rows
+    via `{ stockQuantity: { gt: 0 } }` in the DB, then filtered in JS for
+    `stockQuantity <= lowStockThreshold` — Prisma's `where` can't compare two
+    columns on the same row without raw SQL, so this is a deliberate, commented
+    hybrid rather than either a full-table JS filter or premature raw SQL), and
+    the 5 most recently updated components (`orderBy: { updatedAt: "desc" }, take:
+    5`). Runs all four queries via `Promise.all`.
+  - `searchAllComponents(query)`: case-insensitive `OR` match against `model` or
+    `sku`, capped at 50 results. Deliberately does NOT filter `isAvailable: true`
+    (unlike the public `/api/components` from Milestone 5) — admins need to see
+    everything they manage, including components a shopper wouldn't see.
+  - Both use a shared `Prisma.ComponentGetPayload<{ include: ... }>` type (`Prisma`
+    imported from `@pcbuilder/database`) and a `toRow()` mapper flattening
+    category/brand/inventory relations into one flat row shape for the UI/API.
+- `apps/web/app/api/inventory/route.ts` (new): `GET`, gated via
+  `requireRole(["ADMIN", "INVENTORY_MANAGER"])`, returns
+  `apiSuccess(getInventoryOverview())` or the role-check's own 401/403 via
+  `apiError`.
+- `apps/web/app/admin/page.tsx` (rewritten from Milestone 3's placeholder): reads
+  `searchParams` (Next.js 16 App Router convention — `Promise<{ q?: string }>`,
+  awaited, same pattern as the dynamic-route `params` fix from Milestone 5), calls
+  `getInventoryOverview()` and (if `q` present) `searchAllComponents(q)` in
+  parallel via `Promise.all`. Renders: 3 stat tiles (total/low-stock/out-of-stock
+  counts), a plain `<form method="GET">` search box (deliberately NO client
+  component/JS — a native GET form re-triggers the server component with `?q=`,
+  which is simpler and sufficient for this milestone), and a small
+  `ComponentTable` helper component rendering out-of-stock/low-stock/
+  recently-updated/search-result tables (model + an "unavailable" badge when
+  `isAvailable` is false, SKU, category, brand, stock, updated date). Kept the
+  existing `requireRole` + `redirect("/login")` guard from Milestone 3 at the top.
+- **Verified against the live dev server with real, temporarily-modified data**
+  (not just empty-state screenshots): registered a test admin user, promoted to
+  `ADMIN` via direct SQL, set the seeded RTX 4070's stock to 0 and the RAM kit's
+  stock to 3 (threshold is 5) via SQL, signed in via the credentials flow, then:
+  `GET /api/inventory` → `outOfStock=1` (RTX 4070, qty 0), `lowStock=1` (RAM, qty
+  3/threshold 5), `recent=5` — all correct. `GET /admin` HTML → contained "GeForce
+  RTX 4070", "Vengeance" (the low-stock RAM), and "Total components" — confirmed
+  all three dashboard sections actually render real data, not just typecheck.
+  `GET /admin?q=ryzen` → HTML contained "Ryzen 7 7800X3D" — search works.
+  Unauthenticated `GET /api/inventory` → 401, confirming the role gate holds.
+  Reverted both components' stock back to 25 and deleted the test admin user
+  afterward; confirmed via a direct SQL query that all 7 seeded components show
+  `stockQuantity = 25` again.
+- `pnpm typecheck` (8/8), `pnpm --filter web run lint` (clean), and `pnpm build`
+  (6/6, `/api/inventory` listed in the route table) all pass.
 
 FILES CREATED:
-- packages/component-models/src/types.ts
-- packages/component-models/src/registry.ts
-- packages/component-models/src/categories/{cpu,motherboard,gpu,ram,ssd,psu,case,
-  airCooler,aioCooler,fan,monitor,caseLcd,generic}.ts
-- packages/component-models/tests/categories.test.ts
-- packages/component-models/tests/registry.test.ts
-- packages/component-models/tsconfig.typecheck.json
+- apps/web/lib/inventory.ts
+- apps/web/app/api/inventory/route.ts
 
 FILES MODIFIED:
-- packages/component-models/src/index.ts (re-exports types/registry/every category)
-- packages/component-models/package.json (zod ^3.24.1 → ^4.6.2, added vitest, real
-  `test` script, `typecheck` script now points at tsconfig.typecheck.json)
-- packages/component-models/README.md, docs/DEVELOPMENT.md (testing-strategy
-  section updated to reflect the first real test suite),
+- apps/web/app/admin/page.tsx (full rewrite: stat tiles, search form, three data
+  tables, replacing the Milestone-3 placeholder text)
+- docs/API.md (documented GET /api/inventory, moved it out of the "planned" table),
   project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
   project-management/CURRENT_PHASE.md, project-management/PROJECT_STATUS.md,
   project-management/CHANGELOG.md (this checkpoint's sibling docs)
 
-DATABASE CHANGES: none this session — this milestone is pure application-layer
-validation/type code, no schema or data changes.
+DATABASE CHANGES: none to the schema. (Two components' stock quantities were
+temporarily changed via direct SQL for verification, then reverted — confirmed back
+to the seeded state of 25 each.)
 
-API CHANGES: none this session. (Milestone 2, the admin dashboard, is where these
-schemas actually get consumed by UI/API code.)
+API CHANGES: added `GET /api/inventory` (role-gated).
 
-FRONTEND CHANGES: none this session.
+FRONTEND CHANGES: `/admin` is now a real dashboard instead of a placeholder — see
+above.
 
-3D ENGINE CHANGES: none — packages/three-d-engine is still an empty stub. (Some
-category specs, e.g. GPU's lengthMm/widthMm/heightMm and Case's dimensionsMm, are
-exactly the fields the procedural generators will eventually consume as
-parameters — see ARCHITECTURE.md §7.3 — but no generator code exists yet.)
+3D ENGINE CHANGES: none — packages/three-d-engine is still an empty stub.
 
-KNOWN ISSUES: none new.
+KNOWN ISSUES: none new. Note for whoever picks up Milestone 3 (admin CRUD + image
+upload): no Cloudflare R2 bucket is provisioned on this machine/account yet, so
+"upload to object storage" as literally described in ARCHITECTURE.md §8 isn't
+immediately actionable — that milestone will likely need either a stub/local file
+path (documented as temporary) or a pause to get real R2 credentials from the user
+before wiring up actual uploads. Flagged in CURRENT_PHASE.md so it isn't a surprise
+mid-session.
 
-TEST STATUS: `packages/component-models` now has a real, passing Vitest suite (34
-tests). Every other package still has a placeholder `echo "no tests yet"` test
-script — expected, since `compatibility-engine` (Phase 3, required coverage) and
-`three-d-engine` (Phase 4) don't have real code yet either.
+TEST STATUS: no new automated tests this session (this milestone is CRUD-adjacent
+UI/API wiring with no complex business logic — verified by exercising the real
+server with real data, same reasoning as Milestone 5). `packages/component-models`'s
+34 tests from the previous session still pass.
 
 NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md +
-CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build && pnpm test` still
-pass, then implement Phase 2, Milestone 2 (admin inventory dashboard): an
-admin-only UI in `apps/web` behind the existing `/admin` route (already gated by
-`requireRole`/`proxy.ts` from Phase 1, Milestone 3) showing: total components,
-low-stock components, out-of-stock components, recently-updated components — reading
-from `@pcbuilder/database`'s Prisma client directly (server component, same pattern
-as `/workspace`'s category list). This is the first real content behind the admin
-placeholder. Stop at that checkpoint rather than also building the full CRUD forms
-(Milestone 3) in the same session.
+CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes and
+Postgres is running, then implement Phase 2, Milestone 3 (admin CRUD): a per-category
+dynamic spec form in `/admin` (or a new `/admin/components/new` /
+`/admin/components/[id]/edit` route) generated from `@pcbuilder/component-models`'s
+Zod schemas, `POST /api/components` and `PATCH`/`DELETE /api/components/:id`
+(role-gated), and image upload. Read the "known issues" note above about R2 before
+assuming real object storage is ready to wire up — ask the user how to proceed if it
+matters for that session's scope. Stop at that checkpoint rather than also building
+stock/brand/category management (Milestone 4) in the same session.
 
 EXACT COMMANDS TO RUN THE PROJECT LOCALLY:
   pnpm install
   pnpm dev                     # apps/web on http://localhost:3000
-  pnpm test                    # runs every workspace package's tests (component-models has real ones now)
+
+Try it: register a user, promote it to ADMIN
+(`UPDATE "User" SET role = 'ADMIN' WHERE email = '...'`), log in, visit `/admin` —
+real stat tiles, search box, and out-of-stock/low-stock/recently-updated tables (all
+seeded components currently show stockQuantity=25, so those two sections will be
+empty on a fresh seed unless you manually lower some inventory rows to test).
 
 One-time per machine / after a fresh clone (all already done on this machine):
   cp packages/database/.env.example packages/database/.env
@@ -146,7 +119,7 @@ One-time per machine / after a fresh clone (all already done on this machine):
   pnpm --filter @pcbuilder/database run db:seed
   cp apps/web/.env.example apps/web/.env.local   # fill in DATABASE_URL + generate NEXTAUTH_SECRET
 
-Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`.
+Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 
 Local Postgres on THIS machine: native Windows service `postgresql-x64-17` on
 localhost:5432, superuser `postgres`/`postgres`, app role `pcbuilder`/`pcbuilder`
