@@ -1,8 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 4, Milestone 3 COMPLETE (installation zone system) —
-next up is Milestone 4 (click-to-place wired to the compatibility engine)
-**Overall completion:** ~68%
+**Current phase:** Phase 4, Milestone 4 COMPLETE (click-to-place wired to the
+compatibility engine) — next up is Milestone 5 (remaining procedural generators)
+**Overall completion:** ~72%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -154,14 +154,54 @@ horizontal overflow).
   explicitly schematic, not to-scale. Verified live: CPU, RAM, and PSU
   category selection each correctly highlight only their own matching
   zone(s) across both the case and the motherboard.
+- **Phase 4, Milestone 4 — click-to-place wired to the compatibility engine:**
+  `packages/three-d-engine/src/zones/composeZone.ts` (new, 4 tests) — the
+  pure position-offset function Milestone 3 deferred, used to re-express a
+  placed motherboard's own zones (RAM/PCIe/M.2/SATA slots) in world space once
+  it's actually sitting in a case's `MOBO_TRAY` zone. New
+  `src/placement.ts` (13 tests): `extractCaseZoneSpec`/
+  `extractMotherboardZoneSpec` read real `Component.specifications` into the
+  zone generators' input shapes (returning `null` on malformed data rather
+  than throwing), and `buildGenericModel(categoryKey, specifications)`
+  dispatches to the matching Milestone 2 generator (MOTHERBOARD, CPU, GPU,
+  RAM, PSU) — approximating the handful of generator params the schema
+  doesn't track (GPU fan count, RAM module height, PSU length) with a
+  documented constant, and returning `null` for categories without a
+  generator yet (Milestone 5's job), in which case a plain solid marker
+  stands in for the shape. `WorkspaceCanvas` now takes real `caseComponent`/
+  `placements` props (was hardcoded demo data) and an `onZoneClick` callback
+  — every unoccupied, category-matching zone is now genuinely clickable
+  (with pointer-cursor feedback), and once occupied renders the real
+  placed component's generated model in place of the zone marker.
+  `build-workspace.tsx` wires this up: the case renders as soon as it's
+  added to the build (no zone needed — it's the root container); selecting
+  any other component highlights its matching zones (switched the highlight
+  driver from the category *tab* to the specifically *selected* component,
+  matching ARCHITECTURE.md §7.1's actual interaction model); clicking a
+  matching zone both records the placement and calls the existing
+  `handleAdd`, which re-triggers the real `/api/compatibility/check` — no
+  new compatibility logic needed, Phase 3's engine is reused as-is. Verified
+  live end-to-end: added a real case (renders immediately) → selected a real
+  motherboard (MOBO_TRAY zone glows cyan) → clicked it (the real green
+  motherboard model appears in place of the marker, "Your build" shows it as
+  placed, the compatibility panel shows a genuine `checkCaseFormFactor` INFO
+  result) → selected real RAM (RAM_SLOT zones, now composed onto the placed
+  motherboard, glow cyan) → clicked one (the RAM model appears correctly
+  positioned on the motherboard, and three more genuine RAM compatibility
+  results appear) — proving both levels of zone composition (case→motherboard,
+  motherboard→RAM) work correctly. Playwright needed a small pixel-level grid
+  search to find each zone's exact clickable screen position (R3F raycast
+  targets are tiny at this scale) — a real, if minor, finding about how
+  precise this interaction is at default zoom, noted for future polish.
+  No new console/page errors at any step; no horizontal overflow at 400px
+  mobile width.
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 4.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 5.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 4: click-to-place wired to the compatibility engine (Milestone 4),
-  remaining procedural generators (Milestone 5: Fan, AIO, Air Cooler, SSD,
-  Monitor, Case LCD), GLTF asset loading (Milestone 6).
+- Phase 4: remaining procedural generators (Milestone 5: Fan, AIO, Air Cooler,
+  SSD, Monitor, Case LCD), GLTF asset loading (Milestone 6).
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
 
@@ -174,8 +214,7 @@ horizontal overflow).
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 4, Milestone 4: click-to-place wired to the
-compatibility engine** — clicking a highlighted zone snaps the selected
-component into it and triggers a real `runCompatibilityCheck()` (zones only
-accept compatible placements). See `SESSION_CHECKPOINT.md` for exact resume
-details.
+Say "Continue" to begin **Phase 4, Milestone 5: remaining procedural
+generators** (Fan, AIO, Air Cooler, SSD, Monitor, Case LCD placeholder
+surface) — the categories `buildGenericModel` currently falls back to a
+plain marker for. See `SESSION_CHECKPOINT.md` for exact resume details.

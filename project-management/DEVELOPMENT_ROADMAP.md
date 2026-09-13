@@ -177,7 +177,7 @@ Milestones (each independently shippable):
    components needed for a minimal end-to-end build).
 3. `[x]` Installation zone system generated from a placed Case's spec; zone
    highlighting on component selection.
-4. `[ ]` Click-to-place interaction wired to the compatibility engine (zones only
+4. `[x]` Click-to-place interaction wired to the compatibility engine (zones only
    highlight/accept when compatible; placing triggers a real compatibility
    re-check).
 5. `[ ]` Remaining procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD

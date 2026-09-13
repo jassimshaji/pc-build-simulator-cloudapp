@@ -2,6 +2,40 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-13 — Phase 4, Milestone 4: click-to-place wired to the compatibility engine
+- `composeZone(zone, origin)` (new, 4 tests): the pure position-offset
+  function used to re-express a placed motherboard's own zones in world
+  space once it's sitting in a case's `MOBO_TRAY` zone — the composition
+  step Milestones 2-3 explicitly deferred.
+- `placement.ts` (new, 13 tests): `extractCaseZoneSpec`/
+  `extractMotherboardZoneSpec` read real `Component.specifications` into the
+  zone generators' input shapes; `buildGenericModel(categoryKey,
+  specifications)` dispatches to the matching Milestone 2 generator
+  (MOTHERBOARD, CPU, GPU, RAM, PSU), approximating a few params the schema
+  doesn't track with documented fallback constants, returning `null` for
+  categories without a generator yet (Milestone 5).
+- `WorkspaceCanvas` now takes real `caseComponent`/`placements` props (was
+  hardcoded demo data) and an `onZoneClick` callback — unoccupied,
+  category-matching zones are genuinely clickable (with pointer-cursor
+  feedback); once occupied, the real placed component's generated model
+  renders in its place.
+- `build-workspace.tsx`: the case renders in 3D as soon as it's added (no
+  zone needed, it's the root); clicking a matching zone both places the
+  component and re-triggers the existing `/api/compatibility/check` flow —
+  no new compatibility logic needed. Switched zone highlighting from "which
+  category tab is open" to "which specific component is selected," matching
+  ARCHITECTURE.md §7.1's actual interaction model.
+- Verified live end-to-end: placed a real case, then a real motherboard into
+  its `MOBO_TRAY` zone (real model appears, genuine `checkCaseFormFactor`
+  compatibility result shows up), then real RAM into the motherboard's own
+  composed `RAM_SLOT` zones (correctly positioned, three more genuine RAM
+  compatibility results appear) — proving two levels of zone composition
+  work correctly. Zero console errors throughout; no mobile-width overflow.
+- Noted (not fixed, non-blocking): 3D zone click targets are small at
+  default camera zoom — real UX-polish item for later, not a functional bug.
+- Whole-workspace `pnpm typecheck` (11/11), `pnpm build` (6/6), `pnpm test`
+  (155/155, up from 138), `pnpm --filter web run lint` (clean) all pass.
+
 ## 2026-09-12 — Phase 4, Milestone 3: installation zone system
 - `InstallationZone` type (`{ key, acceptsCategory, position, rotation,
   constraints? }`) matching ARCHITECTURE.md §7.2 exactly, plus two pure,

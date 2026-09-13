@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { CompatibilityReport } from "@pcbuilder/compatibility-engine";
-import type { WorkspaceCanvasHandle } from "@pcbuilder/three-d-engine";
+import type { PlacedComponent, WorkspaceCanvasHandle } from "@pcbuilder/three-d-engine";
 
 // WebGL needs a browser — @react-three/fiber's Canvas can't render on the
 // server, so it's loaded client-only rather than through the normal static
@@ -37,9 +37,11 @@ interface ComponentSummary {
 
 interface BuildLine {
   componentId: string;
+  categoryKey: string;
   categoryLabel: string;
   model: string;
   quantity: number;
+  specifications: Record<string, unknown>;
 }
 
 // Renders a `specifications` value for display. Arrays join with commas;
@@ -58,13 +60,16 @@ function formatSpecValue(value: unknown): string {
   return String(value);
 }
 
-// Text-only build flow (Phase 3, Milestone 4) — a real component picker and a
-// live compatibility/power check, with the 3D placement itself still landing
-// in Phase 4. This deliberately doesn't enforce "one CPU per build" or
-// similar slot uniqueness yet: every added line is just quantity against a
-// componentId, and the compatibility rules already tolerate multiples (e.g.
-// they use the first CPU/motherboard found) — real slot enforcement is a
-// Phase 4/5 concern once there's an actual 3D zone to place into.
+// Component picker with a live compatibility/power check (Phase 3) plus
+// real 3D click-to-place (Phase 4, Milestone 4): a case in the build renders
+// immediately, and selecting a component highlights the 3D zones that accept
+// its category — clicking one snaps it into place (both adding it to the
+// build and, once a motherboard is placed, composing the motherboard's own
+// zones into the case so RAM/GPU/etc. can be placed into *it* in turn).
+// Deliberately doesn't enforce "one CPU per build" or similar slot
+// uniqueness yet: "Add to build" (the button, not a zone click) still lets
+// you add without placing, and the compatibility rules already tolerate
+// multiples — real slot *enforcement* is left for later polish.
 export function BuildWorkspace({ categories }: { categories: Category[] }) {
   const [activeCategoryKey, setActiveCategoryKey] = useState<string | null>(
     categories[0]?.key ?? null,
@@ -73,6 +78,7 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
   const [components, setComponents] = useState<ComponentSummary[]>([]);
   const [selected, setSelected] = useState<ComponentSummary | null>(null);
   const [buildLines, setBuildLines] = useState<BuildLine[]>([]);
+  const [placements, setPlacements] = useState<Record<string, PlacedComponent>>({});
   const [report, setReport] = useState<CompatibilityReport | null>(null);
   const canvasRef = useRef<WorkspaceCanvasHandle>(null);
 
@@ -80,6 +86,12 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
   // for the current selection hasn't resolved yet (handleAdd/handleRemove
   // clear `report` back to null on every selection change below).
   const isCheckingCompatibility = buildLines.length > 0 && report === null;
+
+  // The case renders in 3D as soon as it's added — it's the root container,
+  // not something placed *into* a zone, so there's nothing to click-place it
+  // into. (Takes the first CASE line if more than one somehow ended up in
+  // the build; slot uniqueness isn't enforced.)
+  const caseLine = buildLines.find((line) => line.categoryKey === "CASE");
 
   useEffect(() => {
     if (!activeCategoryKey) {
@@ -136,9 +148,11 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
           ...buildLines,
           {
             componentId: component.id,
+            categoryKey: component.category.key,
             categoryLabel: component.category.label,
             model: component.model,
             quantity: 1,
+            specifications: component.specifications,
           },
         ];
     setBuildLines(next);
@@ -147,7 +161,31 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
 
   function handleRemove(componentId: string) {
     setBuildLines(buildLines.filter((line) => line.componentId !== componentId));
+    setPlacements((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([, placed]) => placed.componentId !== componentId)),
+    );
     setReport(null);
+  }
+
+  // The click-to-place step of ARCHITECTURE.md §7.1: only does anything when
+  // the zone that was clicked actually accepts the category of whatever's
+  // currently selected in the picker (WorkspaceCanvas already only makes
+  // *matching, unoccupied* zones clickable, but this check is what actually
+  // decides whether a placement happens — the 3D package has no notion of
+  // "the selected component", only zone data).
+  function handleZoneClick(zoneKey: string, acceptsCategory: string) {
+    if (!selected || selected.category.key !== acceptsCategory) {
+      return;
+    }
+    handleAdd(selected);
+    setPlacements((prev) => ({
+      ...prev,
+      [zoneKey]: {
+        componentId: selected.id,
+        categoryKey: selected.category.key,
+        specifications: selected.specifications,
+      },
+    }));
   }
 
   return (
@@ -207,7 +245,13 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
         {/* 3D workspace */}
         <main className="flex min-h-[16rem] flex-1 flex-col gap-2 border-b border-zinc-800 p-3 lg:min-h-0 lg:border-b-0 lg:border-r">
           <div className="min-h-0 flex-1 overflow-hidden rounded border border-zinc-800">
-            <WorkspaceCanvas ref={canvasRef} highlightCategory={activeCategoryKey} />
+            <WorkspaceCanvas
+              ref={canvasRef}
+              caseComponent={caseLine ? { componentId: caseLine.componentId, categoryKey: "CASE", specifications: caseLine.specifications } : null}
+              placements={placements}
+              highlightCategory={selected?.category.key ?? null}
+              onZoneClick={handleZoneClick}
+            />
           </div>
           <div className="flex items-center justify-between text-xs text-zinc-500">
             <span>Drag to orbit · Scroll to zoom · Right-click drag to pan</span>
@@ -245,6 +289,15 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
                 >
                   Add to build
                 </button>
+                {selected.category.key === "CASE" ? (
+                  <p className="text-zinc-600">Adds it and shows it in the 3D view immediately.</p>
+                ) : caseLine ? (
+                  <p className="text-zinc-600">
+                    Or click a highlighted zone in the 3D view to place it directly.
+                  </p>
+                ) : (
+                  <p className="text-zinc-600">Add a case first to enable 3D placement.</p>
+                )}
               </div>
             ) : (
               <p className="text-zinc-600">Select a component to see its specifications.</p>
@@ -257,25 +310,31 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
               <p className="text-zinc-600">No components added yet.</p>
             ) : (
               <ul className="mt-2 space-y-1 text-xs">
-                {buildLines.map((line) => (
-                  <li key={line.componentId} className="flex items-center justify-between gap-2">
-                    <span className="text-zinc-300">
-                      {line.model}{" "}
-                      <span className="text-zinc-600">
-                        ({line.categoryLabel}
-                        {line.quantity > 1 ? ` ×${line.quantity}` : ""})
+                {buildLines.map((line) => {
+                  const isPlaced =
+                    line.categoryKey === "CASE" ||
+                    Object.values(placements).some((placed) => placed.componentId === line.componentId);
+                  return (
+                    <li key={line.componentId} className="flex items-center justify-between gap-2">
+                      <span className="text-zinc-300">
+                        {line.model}{" "}
+                        <span className="text-zinc-600">
+                          ({line.categoryLabel}
+                          {line.quantity > 1 ? ` ×${line.quantity}` : ""})
+                        </span>
+                        {isPlaced && <span className="ml-1 text-emerald-500">● placed</span>}
                       </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(line.componentId)}
-                      className="text-zinc-500 hover:text-red-400"
-                      aria-label={`Remove ${line.model}`}
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(line.componentId)}
+                        className="text-zinc-500 hover:text-red-400"
+                        aria-label={`Remove ${line.model}`}
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

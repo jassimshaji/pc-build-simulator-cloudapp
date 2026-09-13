@@ -89,12 +89,14 @@ compatibility results and estimated power update via
 Calculation) is complete.** `packages/database` has a real Prisma schema,
 migration, and seed data (see `docs/DATABASE.md`). `packages/three-d-engine`
 now has a real React Three Fiber canvas (lighting, a reference grid, orbit/
-zoom/pan/reset camera controls) mounted in `/workspace`'s center pane, six
-procedural generic component generators (Case, Motherboard, CPU, RAM, GPU,
-PSU), and a data-driven installation zone system — Case/Motherboard zones are
-generated straight from spec fields (never hand-authored per model) and
-highlight in the 3D view as the component picker's active category changes.
-No click-to-place yet — that's the next Phase 4 milestone. See
+zoom/pan/reset camera controls), six procedural generic component generators
+(Case, Motherboard, CPU, RAM, GPU, PSU), a data-driven installation zone
+system, and genuine click-to-place: add a case in `/workspace` and it renders
+immediately, select a component and its matching 3D zones highlight, click one
+to snap it into place — which re-runs the real Phase 3 compatibility check
+and updates the panel. Categories without a procedural generator yet (Fan,
+AIO, Air Cooler, SSD, Monitor, Case LCD) are still placeable, just as a plain
+marker until Phase 4's next milestone. See
 `project-management/PROJECT_STATUS.md` for live status.
 
 Setup requires a local PostgreSQL server (`docs/DATABASE.md`), an
