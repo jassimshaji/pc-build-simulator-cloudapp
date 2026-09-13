@@ -26,6 +26,11 @@ interface Category {
   label: string;
 }
 
+interface ThreeDAssetSummary {
+  kind: "GLTF_MODEL" | "PROCEDURAL_FALLBACK" | "PLACEHOLDER";
+  url: string | null;
+}
+
 interface ComponentSummary {
   id: string;
   model: string;
@@ -33,6 +38,7 @@ interface ComponentSummary {
   specifications: Record<string, unknown>;
   category: { key: string; label: string };
   brand: { name: string };
+  threeDAssets: ThreeDAssetSummary[];
 }
 
 interface BuildLine {
@@ -42,6 +48,12 @@ interface BuildLine {
   model: string;
   quantity: number;
   specifications: Record<string, unknown>;
+  // The schema allows several ThreeDAsset rows per component, but the admin
+  // 3D asset manager only ever manages one "slot" (see its own route
+  // comment) — the first row is that slot. No row at all just means nobody
+  // has assigned one yet, which resolveComponentAsset already treats as
+  // "use the procedural fallback".
+  asset?: ThreeDAssetSummary;
 }
 
 // Renders a `specifications` value for display. Arrays join with commas;
@@ -153,6 +165,7 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
             model: component.model,
             quantity: 1,
             specifications: component.specifications,
+            asset: component.threeDAssets[0],
           },
         ];
     setBuildLines(next);
@@ -184,6 +197,7 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
         componentId: selected.id,
         categoryKey: selected.category.key,
         specifications: selected.specifications,
+        asset: selected.threeDAssets[0],
       },
     }));
   }
@@ -247,7 +261,16 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
           <div className="min-h-0 flex-1 overflow-hidden rounded border border-zinc-800">
             <WorkspaceCanvas
               ref={canvasRef}
-              caseComponent={caseLine ? { componentId: caseLine.componentId, categoryKey: "CASE", specifications: caseLine.specifications } : null}
+              caseComponent={
+                caseLine
+                  ? {
+                      componentId: caseLine.componentId,
+                      categoryKey: "CASE",
+                      specifications: caseLine.specifications,
+                      asset: caseLine.asset,
+                    }
+                  : null
+              }
               placements={placements}
               highlightCategory={selected?.category.key ?? null}
               onZoneClick={handleZoneClick}

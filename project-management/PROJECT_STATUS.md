@@ -1,9 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 4, Milestone 5 COMPLETE (remaining procedural
-generators — all 12 categories now have one) — next up is Milestone 6 (real
-GLTF asset loading)
-**Overall completion:** ~75%
+**Current phase:** Phase 4 COMPLETE (all 6 milestones) — next up is Phase 5
+(Build Management: save/load/share, build summary panel)
+**Overall completion:** ~80%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -219,26 +218,91 @@ horizontal overflow).
   the SSD rendered as a real thin M.2 slab in the motherboard's `M2_SLOT`
   zone, with genuine compatibility results for each — then deleted both test
   components and the test account.
+- **Phase 4, Milestone 6 — real GLTF asset loading (Phase 4 now complete):**
+  new `packages/three-d-engine/src/resolveComponentAsset.ts`: a pure,
+  framework-agnostic `resolveComponentAsset(categoryKey, specifications,
+  asset?)` implementing ARCHITECTURE.md §7.3's exact resolution order — a
+  `GLTF_MODEL` asset with a real url resolves to `{type:"gltf", url}`; a
+  `PLACEHOLDER` asset resolves to `{type:"placeholder"}`; a
+  `PROCEDURAL_FALLBACK` asset *or no ThreeDAsset row at all* both resolve to
+  `{type:"procedural", model: buildGenericModel(...)}` (the "no row" case is
+  the documented last-resort default, not a placeholder — every component
+  created without visiting the 3D asset manager keeps rendering exactly as
+  it did before this milestone). 6 new Vitest tests cover every branch.
+  `WorkspaceCanvas` gained the actual rendering machinery: `GltfPlacedModel`
+  (loads via `@react-three/drei`'s `useGLTF`, cloning the cached scene per
+  placement so two identical placed components don't fight over one
+  Object3D), a `ModelErrorBoundary` class component (a broken/unreachable
+  GLTF url must not crash the whole canvas, only fall back for that one
+  placement), and `OccupiedFallbackMarker` (the plain marker Milestone 4
+  already had for "occupied, nothing to render" — now reused for
+  PLACEHOLDER, GLTF-still-loading, and GLTF-load-failed alike, rather than
+  inventing a second visual language for the same "nothing real to show"
+  state). `PlacedComponent` gained an optional `asset` field
+  (`{kind, url?}`) threaded through from `apps/web`'s real
+  `Component.threeDAssets[0]`. The case itself (rendered as the root
+  container, not a zone placement) needed its own explicit
+  `resolveComponentAsset("CASE", ...)` check in `WorkspaceCanvas` — it's the
+  one place outside the placement system that needed to resolve an asset;
+  its GLTF Suspense/error fallback is the real procedural wireframe case
+  (already computed for zone-positioning purposes) rather than a generic
+  gray box, since the case must always show *something* the zone system can
+  be positioned against. `apps/web`'s `/api/components` list route now
+  includes `threeDAssets` (the detail-by-id route already did);
+  `build-workspace.tsx` threads each component's first `ThreeDAsset` row
+  through to `WorkspaceCanvas` via the new `asset` field on `BuildLine`/
+  placements/`caseComponent`. Verified live: generated a real, valid `.glb`
+  test asset (three.js's own `GLTFExporter`, run from a small scratch
+  script — a magenta octahedron), created a temporary admin + temporary
+  CASE/MOTHERBOARD test components, and confirmed via Playwright screenshots
+  four distinct real states in the actual running app: no `ThreeDAsset` row
+  → the normal procedural wireframe case (unchanged); `kind: GLTF_MODEL` with
+  a real url → the actual magenta octahedron renders in place of the case;
+  `kind: PLACEHOLDER` on the case → falls back to the procedural wireframe
+  (by design, as above); `kind: PLACEHOLDER` on a component placed *into* a
+  zone → the plain fallback marker, not a real shape. Also re-verified the
+  Milestone 4/5 click-to-place path end-to-end is unaffected: a real seeded
+  motherboard still snaps into `MOBO_TRAY` and triggers a genuine
+  compatibility result. Zero console/page errors throughout. The local
+  SeaweedFS S3 gateway hit an unrelated environment issue this session (its
+  identity/credentials config isn't loading — "Available keys: 0, Auth
+  enabled: false" in its own log regardless of invocation method or
+  documented quoting fixes tried), so the presigned-upload sub-step of the
+  admin flow (already verified working back in Phase 2) was substituted with
+  a trivial local static file server serving the same real `.glb` bytes —
+  what Milestone 6 actually needed proven was the resolve+fetch+render path
+  given a real url, which this fully exercises. All temporary
+  components/users deleted afterward; nothing left in the database.
+
+**PHASE 4 IS NOW COMPLETE** (all 6 milestones: scaffold, procedural
+generators for the original 6 categories, installation zones, click-to-place
++ compatibility re-check, the remaining 6 procedural generators, and real
+GLTF asset resolution/loading).
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 6.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 5.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 4: real GLTF asset loading (Milestone 6) — an admin-uploaded `.glb`
-  overriding the procedural fallback per component.
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
 
 ## Known issues
 - None blocking. Orphaned storage objects on component delete and a cosmetic
-  Turbopack `export *` build warning are still open but non-blocking (unchanged
-  from prior sessions).
+  Turbopack `export *` build warning are still open but non-blocking
+  (unchanged from prior sessions). New this session: the local SeaweedFS dev
+  server isn't loading its `s3-config.json` identities (presigned S3 uploads
+  get a 403 `InvalidAccessKeyId` even with the documented path-quoting fix
+  applied) — this blocks *local* image/model upload testing via the real
+  presigned-upload flow until investigated further; it does not affect
+  production (Cloudflare R2) config, and the Milestone 6 GLTF-rendering path
+  itself was still fully verified using a real `.glb` served a different way.
 
 ## Blockers
-- None.
+- None for development. See the new known issue above if a future session
+  specifically needs to test the local presigned-upload flow.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 4, Milestone 6: real GLTF asset loading** —
-resolving a component's `ThreeDAsset` (uploaded `.glb` vs. procedural
-fallback vs. placeholder) and actually loading/rendering the GLTF when one
-exists. See `SESSION_CHECKPOINT.md` for exact resume details.
+Say "Continue" to begin **Phase 5, Milestone 1: build save/load/rename/
+duplicate/delete**, persisting a build's `workspaceState` (camera) and
+`BuildComponent` placements. See `SESSION_CHECKPOINT.md` for exact resume
+details.

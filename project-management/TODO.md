@@ -43,7 +43,7 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] Installation zone system generated from case spec + zone highlighting
 - [COMPLETED] Click-to-place interaction wired to compatibility engine
 - [COMPLETED] Remaining procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD
-- [TODO] Real GLTF asset loading path (lazy, Suspense, Draco) + resolveComponentAsset
+- [COMPLETED] Real GLTF asset loading path (lazy, Suspense, Draco) + resolveComponentAsset
 
 ## Phase 5 — Build Management
 - [TODO] Save/load/rename/duplicate/delete builds

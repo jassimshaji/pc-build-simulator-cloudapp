@@ -5,9 +5,9 @@ Browse real/configurable PC components, assemble a build in an interactive 3D
 workspace, get live compatibility and power-draw feedback, and save/share builds. An
 admin dashboard manages the component catalog, stock, and 3D assets.
 
-**Project status:** Phases 0-3 complete (architecture, core app foundation,
-component inventory, compatibility engine + power calculator); Phase 4 (3D
-Workspace Foundation) is in progress — the R3F canvas scaffold is done. See
+**Project status:** Phases 0-4 complete (architecture, core app foundation,
+component inventory, compatibility engine + power calculator, 3D workspace
+foundation); Phase 5 (Build Management — save/load/share) is next. See
 `project-management/PROJECT_STATUS.md` for the live status and
 `project-management/SESSION_CHECKPOINT.md` for exact resume instructions.
 
@@ -96,9 +96,13 @@ into place — which re-runs the real Phase 3 compatibility check and updates
 the panel. All 12 component categories now have a real procedural generator
 (Case, Motherboard, CPU, GPU, RAM, PSU, Fan, Radiator, AIO, Air Cooler, SSD,
 Monitor, Case LCD), so every placed component renders as its actual generated
-shape rather than a placeholder marker. Real GLTF asset loading (an
-admin-uploaded `.glb` overriding the procedural fallback) is the next Phase 4
-milestone. See `project-management/PROJECT_STATUS.md` for live status.
+shape rather than a placeholder marker. An admin-uploaded `.glb` (assigned
+via the 3D asset manager) now actually overrides the procedural fallback too —
+`resolveComponentAsset` resolves each component's real `ThreeDAsset` row and
+loads real GLTF files lazily via `@react-three/drei`'s `useGLTF`, with a
+Suspense/error-boundary fallback for loading or broken assets.
+**Phase 4 (3D Workspace Foundation) is complete.** Build save/load/share is
+the next phase. See `project-management/PROJECT_STATUS.md` for live status.
 
 Setup requires a local PostgreSQL server (`docs/DATABASE.md`), an
 `apps/web/.env.local` (`docs/DEVELOPMENT.md` has the exact steps, including

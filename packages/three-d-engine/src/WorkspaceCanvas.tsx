@@ -1,12 +1,22 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import {
+  Component,
+  Suspense,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 import { Canvas } from "@react-three/fiber";
-import { Grid, OrbitControls } from "@react-three/drei";
+import { Grid, OrbitControls, useGLTF } from "@react-three/drei";
 import { Box3, type Group as ThreeGroup } from "three";
 import { createGenericCase } from "./procedural";
 import { mm } from "./procedural/units";
-import { buildGenericModel, extractCaseZoneSpec, extractMotherboardZoneSpec } from "./placement";
+import { extractCaseZoneSpec, extractMotherboardZoneSpec } from "./placement";
+import { resolveComponentAsset, type PlacedComponentAsset } from "./resolveComponentAsset";
 import { composeZone, generateCaseZones, generateMotherboardZones, type InstallationZone } from "./zones";
 
 export interface WorkspaceCanvasHandle {
@@ -23,6 +33,11 @@ export interface PlacedComponent {
   componentId: string;
   categoryKey: string;
   specifications: Record<string, unknown>;
+  // The component's real ThreeDAsset row, when the caller has it (e.g. from
+  // `Component.threeDAssets[0]`). Absent/undefined means "no row at all" —
+  // resolveComponentAsset treats that the same as PROCEDURAL_FALLBACK, per
+  // ARCHITECTURE.md §7.3's resolution order.
+  asset?: PlacedComponentAsset | null;
 }
 
 export interface WorkspaceCanvasProps {
@@ -64,11 +79,111 @@ const ZONE_COLOR_INACTIVE = "#52525b";
 const ZONE_COLOR_HIGHLIGHTED = "#22d3ee";
 const ZONE_COLOR_OCCUPIED = "#a3a3a3";
 
+// The last-resort marker: an admin-marked PLACEHOLDER, a GLTF still loading,
+// a GLTF that failed to load, or (unreachable for any real category since
+// Milestone 5) a category with no generator at all. Same shape/color
+// Milestone 4 used for "occupied, nothing to render yet" — reused rather
+// than inventing a second visual language for what is, to the viewer, the
+// same situation: "something is placed here but there's no real shape".
+function OccupiedFallbackMarker({ position }: { position: [number, number, number] }) {
+  return (
+    <mesh position={position}>
+      <boxGeometry args={[mm(ZONE_MARKER_SIZE_MM), mm(ZONE_MARKER_SIZE_MM), mm(ZONE_MARKER_SIZE_MM)]} />
+      <meshStandardMaterial color={ZONE_COLOR_OCCUPIED} />
+    </mesh>
+  );
+}
+
+// A procedurally-generated THREE.Group isn't a React element — position is
+// applied imperatively once, matching how Milestone 4/5 already did this.
+function GeneratedModel({
+  model,
+  position,
+}: {
+  model: ThreeGroup;
+  position: [number, number, number];
+}) {
+  useEffect(() => {
+    model.position.set(...position);
+  }, [model, position]);
+  return <primitive object={model} />;
+}
+
+// `useGLTF` caches and returns the *same* scene object for a given url, so
+// two placements of the same real component (e.g. two identical RAM sticks
+// in two slots) would otherwise fight over one Object3D's parent/position.
+// Cloning per placement keeps each occurrence independent.
+function GltfPlacedModel({
+  url,
+  position,
+}: {
+  url: string;
+  position: [number, number, number];
+}) {
+  const { scene } = useGLTF(url);
+  const instance = useMemo(() => scene.clone(true), [scene]);
+  useEffect(() => {
+    instance.position.set(...position);
+  }, [instance, position]);
+  return <primitive object={instance} />;
+}
+
+// `useGLTF` suspends while loading and throws on a bad/unreachable url —
+// without this boundary a single broken GLTF asset would crash the whole
+// canvas instead of just that one placement.
+class ModelErrorBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("Failed to load a placed component's 3D asset:", error);
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
+
+// Dispatches a placed component to whichever of the three resolution
+// outcomes applies (ARCHITECTURE.md §7.3): a real uploaded GLTF, the
+// procedural generator, or an explicit placeholder.
+function PlacedComponentModel({
+  placement,
+  position,
+}: {
+  placement: PlacedComponent;
+  position: [number, number, number];
+}) {
+  const resolution = useMemo(
+    () => resolveComponentAsset(placement.categoryKey, placement.specifications, placement.asset),
+    [placement],
+  );
+
+  if (resolution.type === "gltf") {
+    const fallback = <OccupiedFallbackMarker position={position} />;
+    return (
+      <ModelErrorBoundary fallback={fallback}>
+        <Suspense fallback={fallback}>
+          <GltfPlacedModel url={resolution.url} position={position} />
+        </Suspense>
+      </ModelErrorBoundary>
+    );
+  }
+
+  if (resolution.type === "placeholder" || !resolution.model) {
+    return <OccupiedFallbackMarker position={position} />;
+  }
+
+  return <GeneratedModel model={resolution.model} position={position} />;
+}
+
 // One zone: either empty (a translucent marker, brighter when it accepts the
 // currently highlighted category, clickable), or occupied (the placed
-// component's own generated model when one exists for its category —
-// Milestone 5 categories without a generator yet fall back to a solid
-// "occupied" marker instead of a custom shape).
+// component's resolved asset — a real GLTF, its generated model, or a
+// placeholder).
 function ZoneMarker({
   zone,
   worldPosition,
@@ -82,25 +197,8 @@ function ZoneMarker({
   highlightCategory?: string | null;
   onZoneClick?: (zoneKey: string, acceptsCategory: string) => void;
 }) {
-  const placedModel = useMemo(
-    () => (placement ? buildGenericModel(placement.categoryKey, placement.specifications) : null),
-    [placement],
-  );
-
-  useEffect(() => {
-    placedModel?.position.set(...worldPosition);
-  }, [placedModel, worldPosition]);
-
   if (placement) {
-    if (placedModel) {
-      return <primitive object={placedModel} />;
-    }
-    return (
-      <mesh position={worldPosition}>
-        <boxGeometry args={[mm(ZONE_MARKER_SIZE_MM), mm(ZONE_MARKER_SIZE_MM), mm(ZONE_MARKER_SIZE_MM)]} />
-        <meshStandardMaterial color={ZONE_COLOR_OCCUPIED} />
-      </mesh>
-    );
+    return <PlacedComponentModel placement={placement} position={worldPosition} />;
   }
 
   const isHighlighted = highlightCategory != null && zone.acceptsCategory === highlightCategory;
@@ -184,10 +282,27 @@ export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvas
       if (!caseComponent) return null;
       const zoneSpec = extractCaseZoneSpec(caseComponent.specifications);
       if (!zoneSpec) return null;
+      // Always build the procedural case: it's what determines the origin
+      // zones are positioned relative to (the zone system's positions are
+      // schematic, authored against this generator's own coordinate
+      // convention — see Milestone 3/4 — not against whatever proportions an
+      // arbitrary uploaded GLTF happens to have), and it doubles as the
+      // Suspense/error fallback so a real case model still has something
+      // reasonable to show while loading or on failure.
       const model = createGenericCase({ formFactor: "ATX", dimensions: zoneSpec.dimensions });
       const origin = placeAt(model, 0);
       const zones = generateCaseZones(zoneSpec);
       return { model, zones, origin };
+    }, [caseComponent]);
+
+    // Whether to actually display the procedural case above, or a real
+    // uploaded GLTF at the same origin — the one place in this component
+    // that needs to resolve an asset outside the zone/placement system,
+    // since the case is the root container rather than something placed
+    // into a zone.
+    const caseAssetResolution = useMemo(() => {
+      if (!caseComponent) return null;
+      return resolveComponentAsset("CASE", caseComponent.specifications, caseComponent.asset);
     }, [caseComponent]);
 
     // The motherboard's own model isn't rendered separately here — once
@@ -221,7 +336,15 @@ export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvas
 
         {caseScene && (
           <>
-            <primitive object={caseScene.model} />
+            {caseAssetResolution?.type === "gltf" ? (
+              <ModelErrorBoundary fallback={<primitive object={caseScene.model} />}>
+                <Suspense fallback={<primitive object={caseScene.model} />}>
+                  <GltfPlacedModel url={caseAssetResolution.url} position={caseScene.origin} />
+                </Suspense>
+              </ModelErrorBoundary>
+            ) : (
+              <primitive object={caseScene.model} />
+            )}
             <ZoneMarkers
               zones={caseScene.zones}
               origin={caseScene.origin}

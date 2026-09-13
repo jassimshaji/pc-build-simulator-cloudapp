@@ -182,8 +182,10 @@ Milestones (each independently shippable):
    re-check).
 5. `[x]` Remaining procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD
    placeholder surface.
-6. `[ ]` Asset fallback resolution (`resolveComponentAsset`) wired to real
+6. `[x]` Asset fallback resolution (`resolveComponentAsset`) wired to real
    `ThreeDAsset` records + GLTF loading path (lazy, Suspense, Draco).
+
+**PHASE 4 IS NOW COMPLETE** (all 6 milestones).
 
 ---
 

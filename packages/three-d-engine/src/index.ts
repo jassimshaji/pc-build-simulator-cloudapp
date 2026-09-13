@@ -4,3 +4,5 @@ export type { WorkspaceCanvasHandle, WorkspaceCanvasProps, PlacedComponent } fro
 export * from "./procedural";
 export * from "./zones";
 export { extractCaseZoneSpec, extractMotherboardZoneSpec, buildGenericModel } from "./placement";
+export { resolveComponentAsset } from "./resolveComponentAsset";
+export type { PlacedComponentAsset, AssetResolution } from "./resolveComponentAsset";

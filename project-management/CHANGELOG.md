@@ -2,6 +2,44 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-13 — Phase 4, Milestone 6: real GLTF asset loading (Phase 4 complete)
+- New `resolveComponentAsset(categoryKey, specifications, asset?)` in
+  `packages/three-d-engine`: implements ARCHITECTURE.md §7.3's resolution
+  order — a real `GLTF_MODEL` url loads and renders the actual file; an
+  explicit `PLACEHOLDER` kind shows a plain fallback marker; a
+  `PROCEDURAL_FALLBACK` kind *or no `ThreeDAsset` row at all* both fall back
+  to the existing procedural generator (the "no row" case is the documented
+  default, not a placeholder — no visual regression for any existing
+  component). 6 new Vitest tests.
+- `WorkspaceCanvas` gained the real GLTF rendering path: `GltfPlacedModel`
+  (via `@react-three/drei`'s `useGLTF`, cloning per placement so identical
+  placed components don't share one Object3D), a `ModelErrorBoundary` (a
+  bad GLTF url falls back gracefully instead of crashing the canvas), and
+  `OccupiedFallbackMarker` (Milestone 4's existing "occupied, nothing to
+  render" marker, now reused for PLACEHOLDER/loading/error alike). The case
+  itself needed its own explicit asset-resolution check (the one place
+  outside the zone/placement system that renders a component) — its
+  Suspense/error fallback is the real procedural wireframe case rather than
+  a generic box, and an explicit PLACEHOLDER on the case also falls back to
+  that wireframe by design, since the case is the root container the whole
+  zone system is positioned against.
+- `apps/web`: the components list API now includes each component's
+  `threeDAssets`; `build-workspace.tsx` threads a component's real asset
+  through to the 3D canvas for the case, click-to-placed components, and
+  the build-lines list alike.
+- Verified live with a real generated `.glb` test asset (three.js's
+  `GLTFExporter`): confirmed all of no-asset-row (unchanged default),
+  real-GLTF-renders, case-PLACEHOLDER-falls-back-to-wireframe, and
+  placed-component-PLACEHOLDER-shows-fallback-marker as four visually
+  distinct, correct states — plus re-verified the existing click-to-place
+  regression (a real seeded motherboard) still works unchanged. Found (but
+  did not need to fix, since it's pre-existing Phase 2 plumbing rather than
+  this milestone's own code) a local-only SeaweedFS config-loading issue
+  that 403s presigned uploads — worked around for this verification with a
+  substitute static file server; noted for a future session.
+
+**PHASE 4 (3D Workspace Foundation) IS NOW COMPLETE.**
+
 ## 2026-09-13 — Phase 4, Milestone 5: remaining procedural generators
 - Seven new generator functions in `packages/three-d-engine/src/procedural/`:
   `createGenericFan` (frame + a 7-sided cylinder standing in for blades),
