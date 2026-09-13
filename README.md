@@ -89,15 +89,16 @@ compatibility results and estimated power update via
 Calculation) is complete.** `packages/database` has a real Prisma schema,
 migration, and seed data (see `docs/DATABASE.md`). `packages/three-d-engine`
 now has a real React Three Fiber canvas (lighting, a reference grid, orbit/
-zoom/pan/reset camera controls), six procedural generic component generators
-(Case, Motherboard, CPU, RAM, GPU, PSU), a data-driven installation zone
-system, and genuine click-to-place: add a case in `/workspace` and it renders
-immediately, select a component and its matching 3D zones highlight, click one
-to snap it into place — which re-runs the real Phase 3 compatibility check
-and updates the panel. Categories without a procedural generator yet (Fan,
-AIO, Air Cooler, SSD, Monitor, Case LCD) are still placeable, just as a plain
-marker until Phase 4's next milestone. See
-`project-management/PROJECT_STATUS.md` for live status.
+zoom/pan/reset camera controls), a data-driven installation zone system, and
+genuine click-to-place: add a case in `/workspace` and it renders immediately,
+select a component and its matching 3D zones highlight, click one to snap it
+into place — which re-runs the real Phase 3 compatibility check and updates
+the panel. All 12 component categories now have a real procedural generator
+(Case, Motherboard, CPU, GPU, RAM, PSU, Fan, Radiator, AIO, Air Cooler, SSD,
+Monitor, Case LCD), so every placed component renders as its actual generated
+shape rather than a placeholder marker. Real GLTF asset loading (an
+admin-uploaded `.glb` overriding the procedural fallback) is the next Phase 4
+milestone. See `project-management/PROJECT_STATUS.md` for live status.
 
 Setup requires a local PostgreSQL server (`docs/DATABASE.md`), an
 `apps/web/.env.local` (`docs/DEVELOPMENT.md` has the exact steps, including

@@ -1,8 +1,9 @@
 # Project Status
 
-**Current phase:** Phase 4, Milestone 4 COMPLETE (click-to-place wired to the
-compatibility engine) — next up is Milestone 5 (remaining procedural generators)
-**Overall completion:** ~72%
+**Current phase:** Phase 4, Milestone 5 COMPLETE (remaining procedural
+generators — all 12 categories now have one) — next up is Milestone 6 (real
+GLTF asset loading)
+**Overall completion:** ~75%
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -195,13 +196,36 @@ horizontal overflow).
   precise this interaction is at default zoom, noted for future polish.
   No new console/page errors at any step; no horizontal overflow at 400px
   mobile width.
+- **Phase 4, Milestone 5 — remaining procedural generators:** seven new
+  generator functions in `packages/three-d-engine/src/procedural/`:
+  `createGenericFan` (frame + a 7-sided cylinder standing in for blades),
+  `createGenericRadiator` (fixed 120mm fan-row width, length from
+  `sizeMm`), `createGenericAio` (composes `createGenericRadiator` + a pump
+  cylinder), `createGenericAirCooler` (a heatsink tower + a mounted
+  `createGenericFan`, reusing it rather than duplicating geometry),
+  `createGenericSsd` (M.2 2280 vs. 2.5" SATA footprints),
+  `createGenericMonitor` and `createGenericCaseLcd` (no signature documented
+  in ARCHITECTURE.md §7.3 for either — designed to match the existing
+  pattern from the screen-size field each spec actually has). All 12
+  component categories now have a generator. 28 new Vitest tests (one file
+  per generator, same bounding-box-verification standard as Milestone 2).
+  Wired all six new categories into `placement.ts`'s `buildGenericModel`
+  dispatcher — the same mechanical pattern as Milestone 4's five, no other
+  changes needed since the zone system already accepted every category.
+  Since no Fan/SSD/etc. seed data exists, verified live by creating temporary
+  FAN and SSD components through the real admin API (with a throwaway test
+  admin account), then placing both through the actual click-to-place flow:
+  the fan rendered as a real frame+blade shape in a case's `FAN_MOUNT` zone,
+  the SSD rendered as a real thin M.2 slab in the motherboard's `M2_SLOT`
+  zone, with genuine compatibility results for each — then deleted both test
+  components and the test account.
 
 ## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 5.
+- Nothing — at a checkpoint awaiting user instruction to start Phase 4, Milestone 6.
 
 ## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 4: remaining procedural generators (Milestone 5: Fan, AIO, Air Cooler,
-  SSD, Monitor, Case LCD), GLTF asset loading (Milestone 6).
+- Phase 4: real GLTF asset loading (Milestone 6) — an admin-uploaded `.glb`
+  overriding the procedural fallback per component.
 - Phase 5: build save/load/share/summary.
 - Phase 6: fan/airflow visualization.
 
@@ -214,7 +238,7 @@ horizontal overflow).
 - None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 4, Milestone 5: remaining procedural
-generators** (Fan, AIO, Air Cooler, SSD, Monitor, Case LCD placeholder
-surface) — the categories `buildGenericModel` currently falls back to a
-plain marker for. See `SESSION_CHECKPOINT.md` for exact resume details.
+Say "Continue" to begin **Phase 4, Milestone 6: real GLTF asset loading** —
+resolving a component's `ThreeDAsset` (uploaded `.glb` vs. procedural
+fallback vs. placeholder) and actually loading/rendering the GLTF when one
+exists. See `SESSION_CHECKPOINT.md` for exact resume details.

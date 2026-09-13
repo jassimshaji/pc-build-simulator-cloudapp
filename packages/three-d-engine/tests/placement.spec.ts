@@ -88,8 +88,34 @@ describe("buildGenericModel", () => {
     expect(model).toBeInstanceOf(Group);
   });
 
-  it("returns null for categories without a generator yet", () => {
-    expect(buildGenericModel("FAN", {})).toBeNull();
-    expect(buildGenericModel("MONITOR", {})).toBeNull();
+  it("builds a FAN model, falling back to 120mm when sizeMm is absent", () => {
+    expect(buildGenericModel("FAN", {})).toBeInstanceOf(Group);
+  });
+
+  it("builds an AIR_COOLER model, approximating the untracked fan size", () => {
+    const model = buildGenericModel("AIR_COOLER", { heightMm: 160 });
+    expect(model).toBeInstanceOf(Group);
+  });
+
+  it("builds an AIO_COOLER model from a real radiatorSizeMm field", () => {
+    const model = buildGenericModel("AIO_COOLER", { radiatorSizeMm: 360 });
+    expect(model).toBeInstanceOf(Group);
+  });
+
+  it("builds an SSD model from a real formFactor field", () => {
+    const model = buildGenericModel("SSD", { formFactor: "SATA 2.5\"" });
+    expect(model).toBeInstanceOf(Group);
+  });
+
+  it("builds a MONITOR model, falling back to 27in when screenSizeInches is absent", () => {
+    expect(buildGenericModel("MONITOR", {})).toBeInstanceOf(Group);
+  });
+
+  it("builds a CASE_LCD model, falling back to 5in when displaySizeInches is absent", () => {
+    expect(buildGenericModel("CASE_LCD", {})).toBeInstanceOf(Group);
+  });
+
+  it("returns null for a category with no matching generator at all", () => {
+    expect(buildGenericModel("SOMETHING_UNKNOWN", {})).toBeNull();
   });
 });

@@ -42,7 +42,7 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] Procedural generators: Case, Motherboard, CPU, RAM, GPU, PSU
 - [COMPLETED] Installation zone system generated from case spec + zone highlighting
 - [COMPLETED] Click-to-place interaction wired to compatibility engine
-- [TODO] Remaining procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD
+- [COMPLETED] Remaining procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD
 - [TODO] Real GLTF asset loading path (lazy, Suspense, Draco) + resolveComponentAsset
 
 ## Phase 5 — Build Management

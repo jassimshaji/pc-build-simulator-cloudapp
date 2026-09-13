@@ -1,10 +1,16 @@
 import type { Group as ThreeGroup } from "three";
 import {
+  createGenericAio,
+  createGenericAirCooler,
+  createGenericCaseLcd,
   createGenericCpu,
+  createGenericFan,
   createGenericGpu,
+  createGenericMonitor,
   createGenericMotherboard,
   createGenericPsu,
   createGenericRam,
+  createGenericSsd,
   type MotherboardFormFactor,
 } from "./procedural";
 import type { CaseZoneSpec } from "./zones/generateCaseZones";
@@ -69,14 +75,17 @@ export function extractMotherboardZoneSpec(
   return { ramSlots, pcieSlots, m2Slots, sataPorts };
 }
 
-// Builds a placed component's own 3D model from its real specifications, for
-// every category that already has a procedural generator (Milestone 2).
-// Categories without one yet (Fan, AIO, Air Cooler, SSD, Monitor, Case LCD —
-// Milestone 5) return null; the caller falls back to a plain occupied-zone
-// marker for those rather than a custom shape. A few fields these generators
+// Builds a placed component's own 3D model from its real specifications.
+// Every one of the 12 component categories has a procedural generator as of
+// Milestone 5 (Milestone 2 covered Case/Motherboard/CPU/GPU/RAM/PSU;
+// Milestone 5 added Fan/Radiator/AIO/Air Cooler/SSD/Monitor/Case LCD), so
+// this always returns a model — the `default: null` branch below is
+// unreachable for any real `categoryKey` but kept as a safe fallback for
+// data that doesn't match any known category. A few fields these generators
 // want aren't in the component-models schema (GPU fan count, RAM module
-// height, PSU length are all sometimes absent) — approximated with a
-// documented fallback constant rather than left undefined.
+// height, PSU length, AIR_COOLER's fan size are all sometimes absent) —
+// approximated with a documented fallback constant rather than left
+// undefined.
 export function buildGenericModel(
   categoryKey: string,
   specifications: Record<string, unknown>,
@@ -115,6 +124,39 @@ export function buildGenericModel(
           : "ATX";
       const dims = specifications.dimensionsMm as { length?: unknown } | undefined;
       return createGenericPsu({ formFactor, length: numberOr(dims?.length, 160) });
+    }
+    case "FAN": {
+      return createGenericFan({
+        sizeMm: numberOr(specifications.sizeMm, 120),
+        thicknessMm: typeof specifications.thicknessMm === "number" ? specifications.thicknessMm : undefined,
+      });
+    }
+    case "AIR_COOLER": {
+      const dims = specifications.dimensionsMm as { width?: unknown; depth?: unknown } | undefined;
+      return createGenericAirCooler({
+        heightMm: numberOr(specifications.heightMm, 160),
+        fanSizeMm: typeof specifications.fanSizeMm === "number" ? specifications.fanSizeMm : undefined,
+        dimensionsMm:
+          dims && typeof dims.width === "number" && typeof dims.depth === "number"
+            ? { width: dims.width, depth: dims.depth }
+            : undefined,
+      });
+    }
+    case "AIO_COOLER": {
+      return createGenericAio({ radiatorSizeMm: numberOr(specifications.radiatorSizeMm, 240) });
+    }
+    case "SSD": {
+      const formFactor =
+        specifications.formFactor === "SATA 2.5\"" || specifications.formFactor === "M.2 SATA"
+          ? specifications.formFactor
+          : "M.2 NVMe";
+      return createGenericSsd({ formFactor });
+    }
+    case "MONITOR": {
+      return createGenericMonitor({ screenSizeInches: numberOr(specifications.screenSizeInches, 27) });
+    }
+    case "CASE_LCD": {
+      return createGenericCaseLcd({ displaySizeInches: numberOr(specifications.displaySizeInches, 5) });
     }
     default:
       return null;

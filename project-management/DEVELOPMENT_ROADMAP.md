@@ -180,7 +180,7 @@ Milestones (each independently shippable):
 4. `[x]` Click-to-place interaction wired to the compatibility engine (zones only
    highlight/accept when compatible; placing triggers a real compatibility
    re-check).
-5. `[ ]` Remaining procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD
+5. `[x]` Remaining procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD
    placeholder surface.
 6. `[ ]` Asset fallback resolution (`resolveComponentAsset`) wired to real
    `ThreeDAsset` records + GLTF loading path (lazy, Suspense, Draco).

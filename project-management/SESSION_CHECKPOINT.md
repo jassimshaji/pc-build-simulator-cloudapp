@@ -1,196 +1,173 @@
 SESSION DATE: 2026-09-13
 
-CURRENT PHASE: Phase 4, Milestone 4 COMPLETE. Next: Milestone 5 — remaining
-procedural generators (Fan, AIO, Air Cooler, SSD, Monitor, Case LCD).
+CURRENT PHASE: Phase 4, Milestone 5 COMPLETE. Next: Milestone 6 — real GLTF
+asset loading.
 
 CURRENT TASK: None in progress — awaiting user instruction for Phase 4,
-Milestone 5.
+Milestone 6.
 
-LAST COMPLETED STEP: Phase 4, Milestone 4 (click-to-place wired to the
-compatibility engine), verified via typecheck/build/lint, new Vitest tests,
-and a full live Playwright pass placing a real case → motherboard → RAM,
-two levels deep, with genuine compatibility results appearing at each step.
+LAST COMPLETED STEP: Phase 4, Milestone 5 (remaining procedural generators),
+verified via typecheck/build/lint, 28 new Vitest tests, and a live Playwright
+pass using temporary admin-created test components (since no seed data exists
+for these categories).
 
-Before this milestone, the user asked (previous session) why the 3D models
-look like generic boxes instead of real branded products, and whether
-selecting a brand should change the 3D shape. Answered: the 3D view was a
-fixed demo not yet wired to build selections at all (this milestone fixes
-that part), and every model is intentionally generic per ADR-004 (no
-licensed real-brand 3D assets) — a truly "real" model needs an actual
-uploaded `.glb` file (the admin UI for that exists since Phase 2) plus GLTF
-loading logic that doesn't exist yet (Milestone 6). User chose to stay on
-roadmap order rather than reprioritize toward GLTF loading now.
-
-- `packages/three-d-engine/src/zones/composeZone.ts` (new): `composeZone(zone,
-  origin)` — the pure position-offset function Milestones 2-3 explicitly
-  deferred. Offsets a zone's local `position` by an origin, used to
-  re-express a placed motherboard's own zones in world space once it's
-  actually sitting in a case's `MOBO_TRAY` zone. 4 tests.
-- `packages/three-d-engine/src/placement.ts` (new): three pure functions —
-  `extractCaseZoneSpec`/`extractMotherboardZoneSpec` read real
-  `Component.specifications` (untyped JSON by the time it reaches this
-  package) into `generateCaseZones`/`generateMotherboardZones`'s input
-  shapes, returning `null` on malformed/incomplete data rather than
-  throwing; `buildGenericModel(categoryKey, specifications)` dispatches to
-  the matching Milestone 2 generator for MOTHERBOARD, CPU, GPU, RAM, PSU
-  (CASE is handled separately since it's the root, not something placed into
-  a zone) — approximating the handful of params those generators want that
-  the component-models schema doesn't actually track (GPU fan count, RAM
-  module height, PSU length are all sometimes absent) with a documented
-  fallback constant, and returning `null` for categories without a generator
-  yet (Fan, AIO, Air Cooler, SSD, Monitor, Case LCD — Milestone 5), in which
-  case the caller falls back to a plain solid "occupied" marker instead of a
-  custom shape. 13 tests.
-- `packages/three-d-engine/src/WorkspaceCanvas.tsx`: rewritten to take real
-  data instead of a hardcoded demo. New props: `caseComponent` (rendered
-  immediately — it's the root container, nothing to click-place it into),
-  `placements: Record<zoneKey, PlacedComponent>`, `onZoneClick(zoneKey,
-  acceptsCategory)`. `ZoneMarker` (one component instance per zone, so each
-  can call its own hooks safely) now branches three ways: occupied with a
-  generator available → renders the real placed model (positioned via a
-  `useEffect` once built); occupied without one → a solid gray marker;
-  unoccupied → the existing translucent highlight/dim marker, now with a
-  real `onClick` (fires `onZoneClick` only when unoccupied) and pointer-cursor
-  feedback on hover. The motherboard's own zones are computed once
-  `placements.MOBO_TRAY` is set: found via `caseScene.zones.find(key ===
-  "MOBO_TRAY")`, then `generateMotherboardZones(...).map(zone =>
-  composeZone(zone, thatZonesWorldPosition))` — exactly the composition step
-  called out as deferred in the last two checkpoints. (The motherboard's own
-  *model* is no longer rendered as a separate primitive — the case's own
-  `ZoneMarker` for `MOBO_TRAY` already renders it via `buildGenericModel`,
-  so a first draft that rendered both was fixed before ever running, to
-  avoid two overlapping copies of the same shape.)
-- `apps/web/app/workspace/build-workspace.tsx`: `BuildLine` gained
-  `categoryKey`/`specifications` fields (needed to pass real spec data
-  through to the 3D package). New `placements` state
-  (`Record<zoneKey, PlacedComponent>`). New `handleZoneClick(zoneKey,
-  acceptsCategory)`: only acts when the currently `selected` component's
-  category matches what the zone accepts — calls the existing `handleAdd`
-  (so the compatibility check re-runs exactly as it already did for the
-  manual "Add to build" button — no new compatibility logic needed at all)
-  and records the placement. `handleRemove` now also clears any placement(s)
-  referencing the removed component. Switched `highlightCategory` from
-  `activeCategoryKey` (whichever category tab is open) to `selected?.category
-  .key` (the specifically previewed component) — the correct driver for
-  "select a component, then its matching zones highlight," per
-  ARCHITECTURE.md §7.1's actual interaction model; the tab still just filters
-  the list. Added small UX touches: a hint under "Add to build" explaining
-  when 3D placement is available ("add a case first" / "or click a
-  highlighted zone to place it directly"), and a "● placed" tag next to
-  build-list entries that have an actual 3D placement (or are the case
-  itself).
+- Seven new generator files in `packages/three-d-engine/src/procedural/`:
+  - `createGenericFan.ts` — `{ sizeMm, thicknessMm? }`. A frame (box) plus a
+    7-sided cylinder standing in for blades (a loose visual cue, not literal
+    blade geometry — matches ADR-004's "generic, not photorealistic"
+    principle), axis rotated to point along Z (matching how fans mount flat
+    against a case wall in this package's schematic layout).
+  - `createGenericRadiator.ts` — `{ sizeMm, thicknessMm? }`. A box: length =
+    `sizeMm` (the total span across the fan row, e.g. 240/280/360mm), width
+    fixed at the standard single-fan width (120mm) regardless of length,
+    thickness from the param (default 27mm).
+  - `createGenericAio.ts` — `{ radiatorSizeMm }`. Composes
+    `createGenericRadiator` plus a pump/block cylinder at a fixed schematic
+    offset below it (standing in for the tubing run to wherever the block
+    actually sits on the CPU — not a real case-relative position, that's the
+    zone system's job).
+  - `createGenericAirCooler.ts` — `{ heightMm, fanSizeMm?, dimensionsMm? }`.
+    A heatsink tower (box, standing in for the fin stack) plus a
+    `createGenericFan` mounted flush against its front face — reused rather
+    than duplicated. Not a category ARCHITECTURE.md §7.3 gave a signature
+    for; designed to match the pattern using the air cooler spec's own
+    fields.
+  - `createGenericSsd.ts` — `{ formFactor }`. M.2 2280 footprint (80×22mm)
+    for both M.2 NVMe and M.2 SATA (same physical size); 2.5" SATA drive
+    footprint (100.2×69.85×7mm) for `"SATA 2.5\""`.
+  - `createGenericMonitor.ts` — `{ screenSizeInches }`. No documented
+    signature in ARCHITECTURE.md §7.3; derives a 16:9 panel from the
+    diagonal (the only dimension the monitor spec schema actually has) plus
+    a simple two-part stand (post + base) so the whole thing stands on the
+    ground rather than floating.
+  - `createGenericCaseLcd.ts` — `{ displaySizeInches }`. Also undocumented;
+    a "placeholder surface" per the roadmap's own wording — a flat
+    approximately-square panel (the schema has no aspect ratio field) with a
+    subtle emissive tint as the only cue it's a display.
+- `packages/three-d-engine/src/procedural/index.ts`: exports all seven new
+  generators + their param types.
+- `packages/three-d-engine/src/placement.ts`: `buildGenericModel` gained six
+  new `case` branches (FAN, AIR_COOLER, AIO_COOLER, SSD, MONITOR, CASE_LCD) —
+  the same mechanical pattern as Milestone 4's five existing branches
+  (extract known fields, approximate the ones the schema doesn't track with
+  a documented fallback constant, call the matching generator). All 12
+  component categories now produce a real model when placed; the `default:
+  null` branch is effectively unreachable for any real category now, kept as
+  a safe fallback for unrecognized data.
+- 8 new test files (one per generator, 28 tests total): each verifies the
+  actual `THREE.Box3` bounding box matches the given inputs (and that
+  different inputs produce genuinely different, correctly-ordered sizes),
+  same standard as Milestone 2's six. Hit one float-precision flake
+  (`0.15999999... ` vs `0.16` from an exact `toBeGreaterThanOrEqual`
+  assertion) — fixed by switching to `toBeCloseTo`, not a real bug.
+  `tests/placement.spec.ts` gained 6 new cases (one per new dispatcher
+  branch) plus a renamed "returns null for a category with no matching
+  generator at all" test (since every *real* category now has one, the null
+  case is only reachable for made-up category strings).
 
 **Verification:**
 - `pnpm --filter @pcbuilder/three-d-engine run typecheck`/`test` — exit 0,
-  47/47 passing (18 Milestone 2 + 12 Milestone 3 + 4 composeZone + 13
-  placement).
+  81/81 passing (up from 47 last session: 28 new tests across the 7 new
+  generator spec files, plus `placement.spec.ts` growing from 13 to 19 tests
+  for the 6 new dispatcher branches).
 - `pnpm typecheck` (whole workspace) — 11/11 tasks pass.
 - `pnpm build` (whole workspace) — 6/6 pass; only the pre-existing cosmetic
   Turbopack `@prisma/client` warning (unchanged).
-- `pnpm test` (whole workspace) — 155/155 pass (34 component-models + 74
-  compatibility-engine + 47 three-d-engine).
+- `pnpm test` (whole workspace) — 189/189 pass (34 component-models + 74
+  compatibility-engine + 81 three-d-engine).
 - `pnpm --filter web run lint` — clean.
-- **Live Playwright pass, the real end-to-end proof**: added a real seeded
-  case (H510) via the normal "Add to build" flow — it appeared in the 3D
-  view immediately, "Your build" showed it as "● placed", compatibility
-  showed "No issues detected yet." Selected a real motherboard (ROG STRIX
-  B650-A) without adding it — the case's `MOBO_TRAY` zone glowed cyan, a
-  contextual hint appeared ("click a highlighted zone..."). Clicked it (had
-  to grid-search a few pixels to find the exact clickable point — zone hit
-  targets are small at default zoom, noted below) — the real green
-  motherboard model appeared in place of the marker, "Your build" gained it
-  as "● placed", and the compatibility panel showed a genuine
-  `checkCaseFormFactor` INFO result ("Motherboard form factor ATX is
-  supported by this case"), footer power updated to a real 30W/38W. Selected
-  real RAM (Vengeance DDR5) — the motherboard's `RAM_SLOT_n` zones, now
-  correctly composed onto the placed motherboard's world position, glowed
-  cyan. Clicked one — the RAM model rendered correctly positioned on top of
-  the motherboard, "Your build" gained it, and three more genuine
-  compatibility results appeared (RAM type match, capacity, module count),
-  all `INFO`/compatible. Zero console/page errors at every step. Confirmed
-  no horizontal overflow at 400px mobile width.
-- **Minor real finding, not a defect**: R3F's raycast hit targets for the
-  45mm zone markers are only a few screen pixels at the default camera
-  distance, so Playwright needed a small grid-search to land clicks
-  precisely — a human using a mouse has the same precision challenge at this
-  zoom level. Worth a look during future polish (bigger hit targets via an
-  invisible larger interaction mesh around each visible marker, or
-  encouraging users to zoom in first) but not blocking; not fixed this
-  session since it's a UX-polish concern, not a functional bug — noted here
-  rather than acted on.
+- **Live verification, the meaningful proof for rendering code**: no seed
+  data exists for FAN/SSD/AIR_COOLER/AIO_COOLER/MONITOR/CASE_LCD, so real
+  live testing needed real components. Registered a temporary test user via
+  the UI, promoted it to `ADMIN` via SQL, logged back in (fresh JWT), then
+  used `page.request.post` (same authenticated session, Playwright's
+  request API shares cookies with the browser context) to create a real
+  `FAN` component (`sizeMm: 120`) and a real `SSD` component (`M.2 NVMe`,
+  1000GB) through the actual `POST /api/components` route — the same path a
+  real admin would use. Then, through the real `/workspace` UI: placed a
+  real case and motherboard (as in Milestone 4), selected the test fan,
+  clicked its case's `FAN_MOUNT` zone — screenshots (zoomed in, tight crop)
+  show a genuine frame+blade shape, not a plain box, distinct from the
+  flat-shaded zone-marker color; selected the test SSD, clicked an `M2_SLOT`
+  zone on the placed motherboard — screenshot shows a real small flat M.2
+  slab, and the compatibility panel showed a genuine "1 M.2 drive(s) fit
+  within the motherboard's 4 M.2 slots" result. Zero console/page errors
+  throughout. Cleaned up afterward: deleted both test components via
+  `DELETE /api/components/:id` and the test user via SQL — nothing left
+  behind in the database.
 
 FILES CREATED:
-- packages/three-d-engine/src/zones/composeZone.ts
-- packages/three-d-engine/src/placement.ts
-- packages/three-d-engine/tests/composeZone.spec.ts
-- packages/three-d-engine/tests/placement.spec.ts
+- packages/three-d-engine/src/procedural/createGenericFan.ts
+- packages/three-d-engine/src/procedural/createGenericRadiator.ts
+- packages/three-d-engine/src/procedural/createGenericAio.ts
+- packages/three-d-engine/src/procedural/createGenericAirCooler.ts
+- packages/three-d-engine/src/procedural/createGenericSsd.ts
+- packages/three-d-engine/src/procedural/createGenericMonitor.ts
+- packages/three-d-engine/src/procedural/createGenericCaseLcd.ts
+- packages/three-d-engine/tests/createGenericFan.spec.ts
+- packages/three-d-engine/tests/createGenericRadiator.spec.ts
+- packages/three-d-engine/tests/createGenericAio.spec.ts
+- packages/three-d-engine/tests/createGenericAirCooler.spec.ts
+- packages/three-d-engine/tests/createGenericSsd.spec.ts
+- packages/three-d-engine/tests/createGenericMonitor.spec.ts
+- packages/three-d-engine/tests/createGenericCaseLcd.spec.ts
 
 FILES MODIFIED:
-- packages/three-d-engine/src/zones/index.ts (exports composeZone)
-- packages/three-d-engine/src/index.ts (exports placement.ts functions +
-  WorkspaceCanvasProps/PlacedComponent types)
-- packages/three-d-engine/src/WorkspaceCanvas.tsx (real props, click-to-place,
-  placed-model rendering)
-- apps/web/app/workspace/build-workspace.tsx (placements state,
-  handleZoneClick, highlightCategory driver change, UX hints)
+- packages/three-d-engine/src/procedural/index.ts (exports the 7 new generators)
+- packages/three-d-engine/src/placement.ts (6 new buildGenericModel branches)
+- packages/three-d-engine/tests/placement.spec.ts (+6 dispatcher tests)
+- packages/three-d-engine/README.md (rewritten to reflect Milestones 1-5 state
+  — was stale, still describing Milestone 1 only)
 - project-management/DEVELOPMENT_ROADMAP.md, project-management/TODO.md,
   project-management/PROJECT_STATUS.md, project-management/CURRENT_PHASE.md,
-  project-management/CHANGELOG.md (this checkpoint's sibling docs)
+  project-management/CHANGELOG.md, README.md (this checkpoint's sibling docs)
 
-DATABASE CHANGES: none.
+DATABASE CHANGES: none persisted — a temporary test admin user and two
+temporary test components (FAN, SSD) were created and fully deleted within
+this session for live verification. Nothing left behind.
 
-API CHANGES: none — reuses the existing `/api/compatibility/check` exactly as
-Phase 3 built it.
+API CHANGES: none — reused `POST /api/components` and
+`DELETE /api/components/:id` exactly as Phase 2 built them, to create/clean
+up the temporary verification data.
 
-FRONTEND CHANGES: `/workspace` now supports genuine click-to-place: a case
-renders on add, matching zones highlight when a component is selected, and
-clicking one places it (both in 3D and in the build list/compatibility
-panel).
+FRONTEND CHANGES: none beyond what Milestone 4 already built — placing any of
+the 6 newly-generator-equipped categories now renders their real shape
+instead of a plain occupied marker, with no UI code changes needed (the
+dispatcher pattern already existed).
 
-3D ENGINE CHANGES: click-to-place is real and working for every category that
-already has a procedural generator (MOTHERBOARD, CPU, GPU, RAM, PSU);
-categories without one yet (Fan, AIO, Air Cooler, SSD, Monitor, Case LCD) can
-still be placed (the zone system already accepts them) but show a plain
-solid marker instead of a shaped model until Milestone 5.
+3D ENGINE CHANGES: every one of the 12 component categories now has a real
+procedural generator and is wired into the click-to-place dispatcher.
 
-KNOWN ISSUES: none new that block anything. (Carried over, unchanged: orphaned
-storage objects on component delete; the cosmetic Turbopack `export *` build
-warning; build slot uniqueness not enforced — e.g. nothing stops adding two
-cases via the button, though only the first one renders in 3D.) New,
-non-blocking, noted for future polish: 3D zone click targets are small at
-default camera zoom (see "minor real finding" above).
+KNOWN ISSUES: none new. (Carried over, unchanged: orphaned storage objects on
+component delete; the cosmetic Turbopack `export *` build warning; build slot
+uniqueness not enforced; 3D zone click targets are small at default camera
+zoom — all noted in prior checkpoints, none blocking.)
 
-TEST STATUS: 155/155 passing workspace-wide (34 component-models + 74
-compatibility-engine + 47 three-d-engine, up from 138 last session).
+TEST STATUS: 189/189 passing workspace-wide (34 component-models + 74
+compatibility-engine + 81 three-d-engine, up from 155 last session).
 
 NEXT STEP: When the user says "Continue": re-read this file + PROJECT_STATUS.md
 + CURRENT_PHASE.md + TODO.md, confirm `pnpm install && pnpm build` still passes
-and Postgres is running, then start PHASE 4, MILESTONE 5 — remaining
-procedural generators: Fan, AIO, Air Cooler, SSD, Monitor, Case LCD (the last
-one explicitly a "placeholder surface" per the roadmap, not a full model).
-For each, add a `createGenericX` function in
-`packages/three-d-engine/src/procedural/` (matching ARCHITECTURE.md §7.3's
-documented signatures where given — `createGenericFan({ sizeMm,
-thicknessMm })`, `createGenericRadiator({ sizeMm, thicknessMm })` for
-AIO/radiators, `createGenericAIO({ radiatorSizeMm })`, `createGenericSSD({
-formFactor })`; Monitor/Case LCD have no documented signature, use judgment
-matching the existing pattern) with real Vitest bounding-box tests, same
-standard as Milestone 2's six. Then add each new category's `case "X":`
-branch to `buildGenericModel`'s switch in `src/placement.ts` — this is the
-only wiring needed for them to actually appear when click-placed, since the
-zone system (`FAN_MOUNT_n` accepts FAN, `RADIATOR_MOUNT_n` accepts
-AIO_COOLER, `CPU_COOLER_MOUNT` accepts AIR_COOLER) and the click-to-place
-mechanism already exist and need no changes. SSD's zones (`M2_SLOT_n`,
-`SATA_PORT_n`, both already accepting SSD) already work too. Monitor and
-Case LCD have no installation zones defined anywhere yet (they weren't part
-of Milestone 3's case/motherboard zone generators, and don't obviously
-belong in either) — consider whether they need one at all for this
-milestone (a monitor arguably isn't "installed in the case" the way other
-components are) or whether a generator with no corresponding zone is fine
-for now (it just won't be click-placeable, matching how e.g. HDD would work
-if added later without a matching zone). Stop at this milestone's checkpoint
-rather than also starting Milestone 6 (GLTF asset loading) in the same
-session.
+and Postgres is running, then start PHASE 4, MILESTONE 6 — real GLTF asset
+loading. Per ARCHITECTURE.md §7.3's documented resolution order: a
+`resolveComponentAsset(component)` function that checks the component's
+`ThreeDAsset` row — `kind: "GLTF_MODEL"` with a real `url` → load and render
+the actual file (via `@react-three/drei`'s `useGLTF`, which wraps
+`GLTFLoader`/`DRACOLoader` and handles caching; wrap the loading component in
+an R3F `<Suspense>` boundary with a simple fallback, per ARCHITECTURE.md
+§7.4's performance notes); `kind: "PROCEDURAL_FALLBACK"` → the existing
+`buildGenericModel` dispatcher (already built, just needs to be called from
+here instead of always being the default); anything else (`PLACEHOLDER`, or
+no `ThreeDAsset` row at all) → some simple last-resort placeholder shape.
+This needs `WorkspaceCanvas`/`ZoneMarker` to receive a placed component's
+`ThreeDAsset` data (currently they only ever see `specifications` — a new
+field on the `PlacedComponent`/`caseComponent` props, or a separate lookup,
+either works) — this is the actual new wiring this milestone requires, since
+the admin-side upload flow and `buildGenericModel` both already exist.
+Consider testing with a real (even tiny/placeholder) `.glb` file uploaded
+through the existing admin 3D asset manager to confirm the whole pipeline
+end-to-end. Stop at this milestone's checkpoint — Phase 4 is done after this
+(6 of 6 milestones).
 
 EXACT COMMANDS TO RUN THE PROJECT LOCALLY:
   pnpm install
@@ -207,8 +184,10 @@ Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 Local Postgres on THIS machine: native Windows service `postgresql-x64-17` on
 localhost:5432, superuser `postgres`/`postgres`, app role `pcbuilder`/`pcbuilder`
 owning database `pcbuilder`. Confirmed running this session. SeaweedFS is NOT
-running (not needed for this milestone). The dev server was left running this
-session.
+running — Milestone 6 (real GLTF loading) will likely need it if you want to
+test with an actually-uploaded `.glb` file; see docs/DEVELOPMENT.md for
+restart steps and its troubleshooting notes. The dev server was left running
+this session.
 
 A GitHub remote exists: `origin` →
 https://github.com/jassimshaji/pc-build-simulator-cloudapp.git (added by the

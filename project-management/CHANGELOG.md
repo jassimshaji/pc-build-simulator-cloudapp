@@ -2,6 +2,36 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-13 — Phase 4, Milestone 5: remaining procedural generators
+- Seven new generator functions in `packages/three-d-engine/src/procedural/`:
+  `createGenericFan` (frame + a 7-sided cylinder standing in for blades),
+  `createGenericRadiator` (fixed 120mm fan-row width, length from `sizeMm`),
+  `createGenericAio` (composes the radiator generator + a pump cylinder),
+  `createGenericAirCooler` (a heatsink tower + a mounted fan, reusing
+  `createGenericFan` rather than duplicating geometry), `createGenericSsd`
+  (M.2 2280 vs. 2.5" SATA footprints), `createGenericMonitor` and
+  `createGenericCaseLcd` (no documented signature in ARCHITECTURE.md §7.3 for
+  either — designed from each spec's actual screen-size field, matching the
+  existing pattern). All 12 component categories now have a real generator.
+- 28 new Vitest tests (one file per generator, same bounding-box-verification
+  standard as Milestone 2); fixed one float-precision test flake along the
+  way (not a real bug).
+- Wired all six new categories into `placement.ts`'s `buildGenericModel`
+  dispatcher — the same mechanical pattern already used for the first five
+  categories; no other code changes needed since the zone system already
+  accepted every category since Milestone 3.
+- No seed data exists for Fan/SSD/Air Cooler/AIO/Monitor/Case LCD, so live
+  verification created two real temporary test components (a FAN and an SSD)
+  through the actual admin API with a throwaway test admin account, then
+  placed both through the real click-to-place flow: the fan rendered as a
+  genuine frame+blade shape, the SSD as a genuine thin M.2 slab, each with a
+  real compatibility result — then deleted both components and the test
+  account, leaving nothing behind.
+- Rewrote `packages/three-d-engine/README.md`, which had gone stale (still
+  describing Milestone 1's state).
+- Whole-workspace `pnpm typecheck` (11/11), `pnpm build` (6/6), `pnpm test`
+  (189/189, up from 155), `pnpm --filter web run lint` (clean) all pass.
+
 ## 2026-09-13 — Phase 4, Milestone 4: click-to-place wired to the compatibility engine
 - `composeZone(zone, origin)` (new, 4 tests): the pure position-offset
   function used to re-express a placed motherboard's own zones in world
