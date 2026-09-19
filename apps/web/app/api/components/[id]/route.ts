@@ -101,6 +101,17 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   const { id } = await params;
 
+  // Checked up front rather than relying on the foreign-key error: Postgres
+  // reports BuildComponent's RESTRICT constraint in a way Prisma surfaces as an
+  // unmapped "unknown request error" (not P2003), which used to escape as a 500.
+  const usedInBuilds = await prisma.buildComponent.count({ where: { componentId: id } });
+  if (usedInBuilds > 0) {
+    return NextResponse.json(
+      apiError("Cannot delete a component that is used in a saved build."),
+      { status: 409 },
+    );
+  }
+
   try {
     await prisma.component.delete({ where: { id } });
   } catch (error) {

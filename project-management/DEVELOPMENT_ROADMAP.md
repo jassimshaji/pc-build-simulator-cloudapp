@@ -198,11 +198,11 @@ Milestones (each independently shippable):
 ---
 
 ## PHASE 6 — Simulation Features (visual/rule-based first)
-1. `[ ]` Fan orientation (intake/exhaust, forward/reverse blade) visualization + case
+1. `[x]` Fan orientation (intake/exhaust, forward/reverse blade) visualization + case
    pressure summary (positive/negative/neutral).
-2. `[ ]` Simple airflow visualization (animated particles or directional arrows along
+2. `[x]` Simple airflow visualization (animated particles or directional arrows along
    defined intake→exhaust paths).
-3. `[ ]` (Future/backlog, not MVP) Thermal simulation, FPS/performance estimation,
+3. `[x]` (Future/backlog, not MVP) Thermal simulation, FPS/performance estimation,
    noise estimation — architecture should not need to change to add these, but they
    are explicitly out of scope until the MVP above is solid.
 

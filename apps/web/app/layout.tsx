@@ -21,11 +21,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // suppressHydrationWarning: browser extensions (password managers, etc.)
+    // inject attributes onto <html>/<body> before React hydrates, which
+    // otherwise triggers a spurious "server rendered HTML didn't match" error
+    // in dev. It only covers these two elements' own attributes, not children.
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Providers>
           <Nav />
           {children}

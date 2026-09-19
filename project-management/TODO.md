@@ -46,16 +46,16 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] Real GLTF asset loading path (lazy, Suspense, Draco) + resolveComponentAsset
 
 ## Phase 5 — Build Management
-- [TODO] Save/load/rename/duplicate/delete builds
-- [TODO] Build sharing (share slug, public read-only view)
-- [TODO] Build summary panel (components, compatibility, power)
+- [COMPLETED] Save/load/rename/duplicate/delete builds (camera viewpoint saved in workspaceState and restored on load + shared view; API verified live incl. ownership isolation and junk-camera rejection)
+- [COMPLETED] Build sharing (share slug, public read-only view) — API + /shared/[slug] verified live; browser click-through not done
+- [COMPLETED] Build summary panel (components, compatibility, power) — workspace + shared view; browser click-through not done
 
 ## Phase 6 — Simulation Features
-- [TODO] Fan orientation + case pressure (intake/exhaust, forward/reverse blade)
-- [TODO] Simple airflow visualization (particles/arrows)
-- [TODO] (Backlog, post-MVP) Thermal simulation, performance estimation, noise estimation
+- [COMPLETED] Fan orientation + case pressure — mounts assigned front, rear, top (cycling); normal blade intakes at front and exhausts at rear/top, reverse blade flips; net CFM -> positive/negative/balanced; panel in workspace + shared view, live-verified
+- [COMPLETED] Simple airflow visualization (animated particles per fan: orange = exhaust, blue = intake; "Show airflow" toggle in workspace, always on in shared view) — live-verified
+- [COMPLETED] Thermal, performance and noise estimation — rule-based heuristics (packages/three-d-engine/src/estimates.ts), shown as an Estimates panel in the workspace + shared view; labelled as rough estimates, performance is a relative 0-100 score not FPS. Live-verified
 
 ## Cross-cutting / ongoing
-- [TODO] Testing strategy execution (unit/integration/API/compatibility/critical UI)
-- [TODO] Expand docs/API.md, docs/DATABASE.md as real endpoints/schema land
-- [TODO] CI (GitHub Actions: lint/typecheck/test) once there is code to check
+- [COMPLETED] Testing strategy execution — unit (3 packages: 243 tests), API integration (apps/web/tests: 64 tests, real Postgres test DB, every route incl. auth matrix/ownership/CSV/uploads) and critical-UI Playwright (apps/web/e2e: 13 flows). Found + fixed a real 500 (deleting a component used by a build). See docs/DEVELOPMENT.md
+- [COMPLETED] Expanded docs/API.md (builds, sharing, shared view, status-code conventions; removed stale "planned routes"), docs/DATABASE.md (PCBuild/BuildComponent semantics, workspaceState shape, UNPLACED, shareSlug, 20-component seed, test DB) and docs/DEVELOPMENT.md (testing layers + setup)
+- [COMPLETED] CI workflow (.github/workflows/ci.yml: Postgres 17 service, install --frozen-lockfile, prisma generate, typecheck, lint, all Vitest suites, Playwright, failure artifacts). YAML validated and every step reproduced locally; NOT yet run on GitHub — this folder is not a git repo and nothing has been pushed

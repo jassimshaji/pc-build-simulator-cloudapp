@@ -103,22 +103,73 @@ whole `-s3.config=...` argument in one string with embedded literal double quote
 around the path, e.g. `'-s3.config="C:\Users\Some Name\...\s3-config.json"'` as a
 single array element — not `-s3.config=`, `"C:\Users\Some Name\..."` as two.
 
+**Troubleshooting — every presigned upload gets 403 `InvalidAccessKeyId` and the server
+log says "Available keys: 0" / ignores `-ip` and the port flags:** the S3 identities were
+never loaded because `weed.exe` was silently ignoring flags. On a machine whose user path
+contains a space, either (a) pass every path as an 8.3 short name (`C:\Users\ANANDB~1\...`;
+get one via `(New-Object -ComObject Scripting.FileSystemObject).GetFolder($path).ShortPath`),
+and (b) launch it with `Start-Process -ArgumentList @(...)` rather than the `&` call
+operator. If port 8080 is already taken (`Get-NetTCPConnection -State Listen -LocalPort
+8080`), use different `-volume.port`/`-filer.port` values (e.g. 9080/9888) — S3 stays on
+8333 so `.env.local` doesn't change. A ready-made launcher for this is kept outside the
+repo at `%USERPROFILE%\seaweedfs\start-seaweedfs.ps1`.
+
 ## Testing strategy
 
-- **Unit tests (Vitest):** `packages/component-models` — implemented (Phase 2,
-  Milestone 1): 34 tests across `tests/categories.test.ts` (every category schema,
-  valid + invalid cases) and `tests/registry.test.ts` (fallback to the generic
-  schema, hot-field extraction per category). Run with
-  `pnpm --filter @pcbuilder/component-models test`, or `pnpm test` from the root to
-  run every workspace package's tests via Turborepo.
-  `packages/compatibility-engine` (every rule must have a test — required by project
-  standards, not optional, still pending — Phase 3) and `packages/three-d-engine`
-  (procedural generator output dimensions, still pending — Phase 4) are next.
-- **Integration/API tests (Vitest):** API route handlers against a test database.
-- **Critical UI tests (Playwright, later phase):** register/login, add component to
-  build, compatibility warning appears, save/load a build.
+Unit, API-integration and browser layers, all implemented. `pnpm test` (root) runs the
+unit and API-integration suites; the browser tests are separate because they build
+and start the app.
 
-Run tests with `pnpm test` (root, runs all workspaces) once configured.
+| Layer | Where | What it covers | Run |
+| --- | --- | --- | --- |
+| Unit | `packages/component-models` | every category spec schema (valid + invalid), registry fallback, hot-field extraction | `pnpm --filter @pcbuilder/component-models test` |
+| Unit | `packages/compatibility-engine` | every compatibility rule + the power calculator (required for every rule) | `pnpm --filter @pcbuilder/compatibility-engine test` |
+| Unit | `packages/three-d-engine` | procedural generators, zone generation, placement, asset resolution, build (de)serialization, summary, airflow, estimates, camera state | `pnpm --filter @pcbuilder/three-d-engine test` |
+| API integration | `apps/web/tests/*.test.ts` (Vitest) | every route handler against a real Postgres test database: auth matrix (401/403), validation (400), conflicts (409), ownership isolation, sharing, CSV round-trip, uploads | `pnpm --filter web test` |
+| Critical UI | `apps/web/e2e/*.spec.ts` (Playwright) | register/login/logout, role gating, adding parts + live compatibility error, save/list/reopen/rename/duplicate/delete a build, sharing + revoking a link | `pnpm --filter web test:e2e` |
+
+### API integration tests
+
+They call the exported route handlers directly (`GET(request)`, `POST(request)`, ...)
+with real `Request` objects, against a **separate database** so development data is
+never touched. One-time setup (a role with `CREATEDB`, as in DATABASE.md):
+
+```sql
+CREATE DATABASE pcbuilder_test OWNER pcbuilder;
+```
+
+The default URL is `postgresql://pcbuilder:pcbuilder@localhost:5432/pcbuilder_test`;
+override with `TEST_DATABASE_URL`. Before each run, `tests/globalSetup.ts` applies
+all migrations and re-runs the seed against that database (both idempotent), so every
+test can rely on the seeded catalog (look components up by SKU with
+`componentBySku`). Tests create their own users/components with a per-run prefix and
+clean them up afterwards.
+
+The only thing replaced is `requireRole` (there is no real next-auth JWT outside a
+Next request): the mock in `tests/setup.ts` reproduces its exact 401/403/ok contract
+for a session set with `loginAs(user)`. The real implementation has its own test
+(`tests/requireRole.test.ts`).
+
+### Browser (Playwright) tests
+
+`playwright.config.ts` builds the app, starts it with `next start` on **port 3100**
+(so it never collides with `pnpm dev` on 3000) pointed at the same test database, and
+runs the flows in `e2e/`. Locally, `PW_CHANNEL=msedge` uses an installed Edge with no
+download; otherwise install Playwright's Chromium once with
+`pnpm --filter web exec playwright install chromium`. If a server is already up on
+3100 it is reused (handy while iterating: build once, `next start -p 3100`, re-run).
+
+```powershell
+$env:PW_CHANNEL = "msedge"   # optional
+pnpm --filter web test:e2e
+```
+
+### CI
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request: a
+Postgres 17 service (which creates the test database), install, Prisma generate,
+typecheck, lint, all Vitest suites, then the Playwright suite (traces/screenshots
+are uploaded as artifacts when it fails).
 
 ## Code quality rules
 

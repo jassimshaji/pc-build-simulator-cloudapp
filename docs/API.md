@@ -1,12 +1,9 @@
 # API Reference
 
-Status: auth (Phase 1, Milestone 3), read-only component/category routes (Phase 1,
-Milestone 5), the inventory dashboard route (Phase 2, Milestone 2), admin CRUD +
-image upload (Phase 2, Milestone 3), stock/brand/category management (Phase 2,
-Milestone 4), CSV import/export (Phase 2, Milestone 5), and the 3D asset manager
-(Phase 2, Milestone 6 — the last Phase 2 milestone) are all implemented; everything
-else is still design-stage. This document will be filled in with real
-request/response shapes as each remaining route is built.
+Status: every route the application uses is implemented and covered by an automated
+test (`apps/web/tests/`, see DEVELOPMENT.md — Testing strategy): auth, the public
+catalog, admin component/brand/category/inventory management, image and 3D-model
+upload, CSV import/export, compatibility checking, and saved builds with sharing.
 
 ## Conventions
 
@@ -14,8 +11,10 @@ Every route returns `packages/shared`'s envelope: `{ data, error }`, never both
 populated (`apiSuccess(data)` / `apiError(message, issues?)` from
 `@pcbuilder/shared`). Query/body validation uses Zod; a validation failure returns
 `400` with `error.issues` set to the Zod flattened error. Mutating routes and
-role-gated routes will use `apps/web/lib/requireRole.ts` — never trust a
-client-supplied role.
+role-gated routes use `apps/web/lib/requireRole.ts` — never trust a
+client-supplied role. Status codes are used consistently: `401` not signed in, `403`
+signed in with the wrong role, `400` invalid input, `404` not found, `409` conflict
+(duplicate, or still referenced).
 
 ## Implemented
 
@@ -75,9 +74,9 @@ existing category and hot columns are recomputed. `404` if the id doesn't exist.
 
 ### `DELETE /api/components/:id`
 `ADMIN`/`INVENTORY_MANAGER` only. `404` if the id doesn't exist. `409` if the
-component is referenced by a saved build's `BuildComponent` row (foreign key
-constraint — no builds exist yet as of Phase 2, so this is currently unreachable in
-practice, but handled rather than surfacing a raw 500).
+component is referenced by any saved build's `BuildComponent` row (checked up front
+with a count — Postgres reports that RESTRICT constraint in a way Prisma surfaces as
+an unmapped error, which used to escape as a 500 until an integration test caught it).
 
 ### `GET /api/inventory`
 `ADMIN`/`INVENTORY_MANAGER` only (`401` if unauthenticated, `403` for a `USER`
@@ -207,11 +206,68 @@ logic is duplicated between this route and the UI.
   the top of any server component or API route handler that needs role enforcement;
   never trust a client-supplied role.
 
-## Planned routes (Phase 2+)
+## Builds (signed-in users)
 
-| Route | Methods | Purpose | Auth |
-|---|---|---|---|
-| `/api/builds` | GET/POST | List/create user builds | USER+ |
-| `/api/builds/:id` | GET/PATCH/DELETE | Load/update/delete a build | owner or ADMIN |
+Every builds route requires a session (any role: `USER`, `ADMIN` or
+`INVENTORY_MANAGER`) and is scoped to the caller: a build owned by someone else —
+even by an admin looking at a user's — is reported as `404`, never `403`, so build ids
+can't be probed. Logic shared by the routes is in `apps/web/lib/builds.ts`.
 
-Each route will be documented here with request/response JSON examples as it's built.
+A build's components are sent as **`rows`**: `[{ componentId, installedZoneKey }]`,
+**one row per physical unit** (two identical RAM kits = two rows). `installedZoneKey`
+is a 3D installation zone (`MOBO_TRAY`, `RAM_SLOT_1`, `FAN_MOUNT_2`, ...) or
+`"UNPLACED"` for a unit that is in the build but not placed (the case is always
+`UNPLACED`). The client converts to/from its in-memory shape with
+`serializeBuild` / `deserializeBuild` from `@pcbuilder/three-d-engine`.
+
+### `GET /api/builds`
+The caller's builds, newest-updated first, as
+`{ id, name, estimatedPowerWatts, compatibilityStatus, createdAt, updatedAt,
+_count: { components } }`.
+
+### `POST /api/builds`
+Body: `{ name (1-100 chars, trimmed), rows?: Row[] (default []), workspaceState? }`.
+Creates the build, and stores a server-computed snapshot of the compatibility report
+(`compatibilityStatus`) and `estimatedPowerWatts` — the client never supplies those.
+`400` for invalid input or if any `componentId` no longer exists. `201` with the build.
+
+`workspaceState` is **not stored as sent**: only `{ camera: { position: [x,y,z],
+target: [x,y,z] } }` is understood, each coordinate must be a finite number within
+±100, and the position must differ from the target. Anything else is dropped (the
+existing value is left unchanged), so the column can never hold arbitrary client JSON.
+
+### `GET /api/builds/:id`
+The build with its `components`, each including `component` with `category`, `brand`
+and `threeDAssets`. `404` if it doesn't exist or isn't yours.
+
+### `PATCH /api/builds/:id`
+Body (all optional): `{ name?, rows?, workspaceState? }`. `rows`, when present,
+**replaces the entire component set** (the workspace saves full state, not diffs) and
+recomputes the compatibility/power snapshot; if a `componentId` is unknown the whole
+request fails with `400` and the build is unchanged. `404` if not found/not yours.
+
+### `DELETE /api/builds/:id`
+Deletes the build and, by cascade, its `BuildComponent` rows. `404` if not found/not yours.
+
+### `POST /api/builds/:id/duplicate`
+Creates a copy named `"<name> (copy)"` (truncated to 100 chars) with the same
+components, camera and snapshot. The copy is always **private** — sharing state is
+never copied. `201` with the new build.
+
+### `POST /api/builds/:id/share`
+Body: `{ enabled: boolean }`. Owner only.
+- `enabled: true` — makes the build publicly viewable and returns
+  `{ isShared: true, shareSlug }`. The slug is a random 12-character URL-safe token
+  (72 bits of entropy). Calling it again while shared returns the *same* slug (so the
+  link doesn't change on repeated clicks).
+- `enabled: false` — returns `{ isShared: false, shareSlug: null }` and **deletes the
+  slug**, so the old link is dead for good; re-enabling mints a new, different slug.
+
+## Public shared view
+
+### `GET /shared/:slug` (page, not a JSON route)
+No authentication. Renders a read-only view of a build — the 3D scene, component list,
+build summary, airflow, estimates, and the compatibility report as of the owner's last
+save — with no picker and no save/share controls. It resolves only when the build has
+`isShared = true` **and** the slug matches; anything else (unknown slug, sharing turned
+off) is a `404`. The saved camera viewpoint is restored if the build has one.

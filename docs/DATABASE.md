@@ -48,18 +48,49 @@ since a config file present disables Prisma's automatic env loading.
 - **`CompatibilityRule`** — admin-visible registry of rule keys/severity/active flag.
   The actual comparison logic lives in `packages/compatibility-engine` (Phase 3), not
   in the database.
-- **`PCBuild`** / **`BuildComponent`** — a user's saved build, its workspace/camera
-  state, last compatibility report snapshot, estimated power, and the per-slot
-  placed components (position/rotation, installed zone key).
+- **`PCBuild`** — a user's saved build (`userId`, cascade-deleted with the user).
+  Columns beyond `name`:
+  - `workspaceState Json?` — currently `{ "camera": { "position": [x,y,z], "target": [x,y,z] } }`
+    (scene units = meters). Written only through `sanitizeWorkspaceState` in
+    `apps/web/lib/builds.ts`, which validates the camera and drops everything else,
+    so the column never holds arbitrary client JSON.
+  - `compatibilityStatus Json?` / `estimatedPowerWatts Int?` — a snapshot of the last
+    `CompatibilityReport`, recomputed server-side on every create and on every
+    update that replaces the components. Used for the public shared view and list
+    views so they don't recompute.
+  - `isShared Boolean` / `shareSlug String? @unique` — sharing. `shareSlug` is a
+    random 12-character URL-safe token (72 bits) set when sharing is enabled and
+    **cleared to null when it is disabled**, so an old link can never be revived;
+    re-enabling mints a new one. A build is publicly readable only when
+    `isShared` is true *and* the slug matches.
+- **`BuildComponent`** — one row **per physical unit** in a build (three identical
+  RAM kits are three rows), cascade-deleted with the build. `installedZoneKey` is
+  the installation zone it occupies (`MOBO_TRAY`, `RAM_SLOT_1`, `FAN_MOUNT_2`, ...)
+  or the sentinel **`UNPLACED`** for units that are in the build but not placed into
+  a 3D zone (the case is always `UNPLACED` — it is the root container, not a zone
+  occupant). `packages/three-d-engine/src/buildSerialization.ts` converts between
+  these rows and the workspace's `{ quantity per component, zone -> component }`
+  shape. `positionX/Y/Z` and `rotationX/Y/Z` exist but are unused today (a zone
+  determines placement). `componentId` is `RESTRICT`: a component used in any build
+  cannot be deleted (the API returns 409).
+
+## Test database
+
+Automated tests use their own `pcbuilder_test` database (never the dev one); see
+`docs/DEVELOPMENT.md` (Testing strategy). `apps/web/test-support/testDatabase.ts`
+applies migrations and the seed to it before every run.
 
 ## Seed data
 
-`packages/database/prisma/seed.ts` seeds all 12 planned component categories (even
-ones with zero components yet, so adding real components later is pure data entry),
-8 brands, 8 compatibility rule definitions, and 7 real-ish components (2 CPUs, 1
-motherboard, 1 GPU, 1 RAM kit, 1 PSU, 1 case) each with an `Inventory` row and a
-`PROCEDURAL_FALLBACK` `ThreeDAsset` pointing at the (not-yet-implemented) generic
-generator it'll use once `packages/three-d-engine` exists.
+`packages/database/prisma/seed.ts` seeds all 12 component categories, 11 brands,
+8 compatibility rule definitions, and 20 real-ish components covering **every**
+category (2 CPUs, 2 motherboards, 2 GPUs, 2 RAM kits, 2 PSUs, 2 cases, 2 SSDs, 2
+fans, 1 air cooler, 1 AIO, 1 monitor, 1 case LCD), each with an `Inventory` row
+(stock 25) and a `PROCEDURAL_FALLBACK` `ThreeDAsset` for the generic generator in
+`packages/three-d-engine`. Several are deliberately awkward so compatibility rules
+have something to catch — a 358 mm GPU, a Mini-ITX-only case with a 55 mm cooler
+limit, DDR4 RAM, a 450 W PSU, an LGA1700 board — and the API/E2E tests rely on
+them (look them up by SKU).
 
 Each component's `specifications` is validated against its category's real
 `@pcbuilder/component-models` schema at seed time (`validateSpecifications` /

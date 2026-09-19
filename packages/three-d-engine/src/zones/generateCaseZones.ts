@@ -1,6 +1,17 @@
 import { mm } from "../procedural/units";
 import type { InstallationZone } from "./types";
 
+export type FanMountFace = "FRONT" | "REAR" | "TOP";
+
+// The case spec only lists supported fan *sizes*, not where they mount, so
+// mounts are assigned to faces by a fixed, conventional order: first the
+// front (intake), then the rear (exhaust), then the top, then cycling. This is
+// the single source of truth for a mount's face — airflow.ts derives flow
+// direction from the same function rather than guessing from positions.
+export function fanMountFace(index: number): FanMountFace {
+  return (["FRONT", "REAR", "TOP"] as const)[index % 3];
+}
+
 export interface CaseZoneSpec {
   dimensions: { width: number; height: number; depth: number }; // mm
   maxGpuLengthMm: number;
@@ -70,13 +81,25 @@ export function generateCaseZones(spec: CaseZoneSpec): InstallationZone[] {
     });
   });
 
+  // Mounts already on each face, so several fans on the same face sit side by
+  // side instead of overlapping.
+  const perFaceCount: Record<FanMountFace, number> = { FRONT: 0, REAR: 0, TOP: 0 };
   (spec.fanSupportMm ?? []).forEach((sizeMm, index) => {
+    const face = fanMountFace(index);
+    const slot = perFaceCount[face]++;
+    const sideOffset = -halfWidth * 0.3 + slot * mm(140);
+    const position: [number, number, number] =
+      face === "FRONT"
+        ? [sideOffset, 0, -halfDepth * 0.9]
+        : face === "REAR"
+          ? [sideOffset, 0, halfDepth * 0.9]
+          : [sideOffset, halfHeight * 0.9, 0];
     zones.push({
       key: `FAN_MOUNT_${index + 1}`,
       acceptsCategory: "FAN",
-      position: [-halfWidth * 0.3 + index * mm(140), 0, halfDepth * 0.9],
+      position,
       rotation: [0, 0, 0],
-      constraints: { sizeMm },
+      constraints: { sizeMm, face },
     });
   });
 

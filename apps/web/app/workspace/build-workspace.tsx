@@ -2,8 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import type { CompatibilityReport } from "@pcbuilder/compatibility-engine";
-import type { PlacedComponent, WorkspaceCanvasHandle } from "@pcbuilder/three-d-engine";
+import { serializeBuild } from "@pcbuilder/three-d-engine/src/buildSerialization";
+import { AirflowPanel } from "@/components/airflow-panel";
+import { BuildSummary } from "@/components/build-summary";
+import { EstimatesPanel } from "@/components/estimates-panel";
+import type { CameraState, PlacedComponent, WorkspaceCanvasHandle } from "@pcbuilder/three-d-engine";
 
 // WebGL needs a browser — @react-three/fiber's Canvas can't render on the
 // server, so it's loaded client-only rather than through the normal static
@@ -41,12 +46,13 @@ interface ComponentSummary {
   threeDAssets: ThreeDAssetSummary[];
 }
 
-interface BuildLine {
+export interface BuildLine {
   componentId: string;
   categoryKey: string;
   categoryLabel: string;
   model: string;
   quantity: number;
+  price: number; // unit price
   specifications: Record<string, unknown>;
   // The schema allows several ThreeDAsset rows per component, but the admin
   // 3D asset manager only ever manages one "slot" (see its own route
@@ -82,15 +88,38 @@ function formatSpecValue(value: unknown): string {
 // uniqueness yet: "Add to build" (the button, not a zone click) still lets
 // you add without placing, and the compatibility rules already tolerate
 // multiples — real slot *enforcement* is left for later polish.
-export function BuildWorkspace({ categories }: { categories: Category[] }) {
+export interface InitialBuild {
+  id: string;
+  name: string;
+  buildLines: BuildLine[];
+  placements: Record<string, PlacedComponent>;
+  shareSlug?: string | null;
+  camera?: CameraState | null;
+}
+
+export function BuildWorkspace({
+  categories,
+  initialBuild,
+}: {
+  categories: Category[];
+  initialBuild?: InitialBuild;
+}) {
+  const [buildId, setBuildId] = useState<string | null>(initialBuild?.id ?? null);
+  const [buildName, setBuildName] = useState(initialBuild?.name ?? "My build");
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showAirflow, setShowAirflow] = useState(true);
+  const [shareSlug, setShareSlug] = useState<string | null>(initialBuild?.shareSlug ?? null);
   const [activeCategoryKey, setActiveCategoryKey] = useState<string | null>(
     categories[0]?.key ?? null,
   );
   const [search, setSearch] = useState("");
   const [components, setComponents] = useState<ComponentSummary[]>([]);
   const [selected, setSelected] = useState<ComponentSummary | null>(null);
-  const [buildLines, setBuildLines] = useState<BuildLine[]>([]);
-  const [placements, setPlacements] = useState<Record<string, PlacedComponent>>({});
+  const [buildLines, setBuildLines] = useState<BuildLine[]>(initialBuild?.buildLines ?? []);
+  const [placements, setPlacements] = useState<Record<string, PlacedComponent>>(
+    initialBuild?.placements ?? {},
+  );
   const [report, setReport] = useState<CompatibilityReport | null>(null);
   const canvasRef = useRef<WorkspaceCanvasHandle>(null);
 
@@ -164,6 +193,7 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
             categoryLabel: component.category.label,
             model: component.model,
             quantity: 1,
+            price: Number(component.price),
             specifications: component.specifications,
             asset: component.threeDAssets[0],
           },
@@ -178,6 +208,29 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
       Object.fromEntries(Object.entries(prev).filter(([, placed]) => placed.componentId !== componentId)),
     );
     setReport(null);
+  }
+
+  // "Add to build" button: adds the component and, if there's a free
+  // compatible zone in the 3D scene (needs a case, and a motherboard for
+  // RAM/GPU/etc.), drops it straight into the first one so it actually shows
+  // up — otherwise it's only listed, with the hint text below the button.
+  function handleAddAndPlace(component: ComponentSummary) {
+    handleAdd(component);
+    if (component.category.key === "CASE") {
+      return;
+    }
+    const zoneKey = canvasRef.current?.findFreeZone(component.category.key);
+    if (zoneKey) {
+      setPlacements((prev) => ({
+        ...prev,
+        [zoneKey]: {
+          componentId: component.id,
+          categoryKey: component.category.key,
+          specifications: component.specifications,
+          asset: component.threeDAssets[0],
+        },
+      }));
+    }
   }
 
   // The click-to-place step of ARCHITECTURE.md §7.1: only does anything when
@@ -202,8 +255,120 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
     }));
   }
 
+  // Saves the full workspace state: creates the build on first save, then
+  // replaces its component set (and the current camera viewpoint) on every
+  // later one.
+  async function handleSave() {
+    setIsSaving(true);
+    setSaveStatus(null);
+    try {
+      const rows = serializeBuild(buildLines, placements);
+      const response = await fetch(buildId ? `/api/builds/${buildId}` : "/api/builds", {
+        method: buildId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: buildName,
+          rows,
+          workspaceState: { camera: canvasRef.current?.getCameraState() ?? undefined },
+        }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        setSaveStatus(
+          response.status === 401
+            ? "Log in to save builds."
+            : (body?.error?.message ?? "Save failed."),
+        );
+        return;
+      }
+      setBuildId(body.data.id);
+      setSaveStatus("Saved.");
+    } catch {
+      setSaveStatus("Save failed.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleShareToggle(enabled: boolean) {
+    if (!buildId) return;
+    setSaveStatus(null);
+    const response = await fetch(`/api/builds/${buildId}/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    }).catch(() => null);
+    const body = await response?.json().catch(() => null);
+    if (!response?.ok) {
+      setSaveStatus(body?.error?.message ?? "Could not update sharing.");
+      return;
+    }
+    setShareSlug(body.data.shareSlug);
+  }
+
+  async function handleCopyLink() {
+    if (!shareSlug) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/shared/${shareSlug}`);
+      setSaveStatus("Link copied.");
+    } catch {
+      setSaveStatus(`${window.location.origin}/shared/${shareSlug}`);
+    }
+  }
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    // Pinned to the viewport below the 3.5rem nav so the panels scroll
+    // internally instead of the whole page growing past the footer.
+    <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-800 bg-zinc-900/40 px-4 py-2 text-xs">
+        <input
+          type="text"
+          value={buildName}
+          maxLength={100}
+          onChange={(event) => setBuildName(event.target.value)}
+          aria-label="Build name"
+          className="w-56 rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-100"
+        />
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving || !buildName.trim()}
+          className="rounded bg-zinc-100 px-3 py-1 font-medium text-zinc-950 disabled:opacity-50"
+        >
+          {isSaving ? "Saving..." : buildId ? "Save" : "Save build"}
+        </button>
+        {buildId &&
+          (shareSlug ? (
+            <>
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="rounded border border-zinc-800 px-2 py-1 hover:bg-zinc-900"
+              >
+                Copy share link
+              </button>
+              <button
+                type="button"
+                onClick={() => handleShareToggle(false)}
+                className="text-zinc-400 hover:text-red-400"
+              >
+                Stop sharing
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleShareToggle(true)}
+              className="rounded border border-zinc-800 px-2 py-1 hover:bg-zinc-900"
+            >
+              Share
+            </button>
+          ))}
+        <Link href="/builds" className="text-zinc-400 hover:text-zinc-100">
+          My builds
+        </Link>
+        {saveStatus && <span className="text-zinc-500">{saveStatus}</span>}
+      </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* Component inventory panel */}
         <aside className="flex shrink-0 flex-col border-b border-zinc-800 bg-zinc-900/40 lg:w-64 lg:border-b-0 lg:border-r lg:overflow-y-auto">
@@ -274,10 +439,20 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
               placements={placements}
               highlightCategory={selected?.category.key ?? null}
               onZoneClick={handleZoneClick}
+              showAirflow={showAirflow}
+              initialCamera={initialBuild?.camera}
             />
           </div>
           <div className="flex items-center justify-between text-xs text-zinc-500">
             <span>Drag to orbit · Scroll to zoom · Right-click drag to pan</span>
+            <label className="ml-auto mr-3 flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={showAirflow}
+                onChange={(event) => setShowAirflow(event.target.checked)}
+              />
+              Show airflow
+            </label>
             <button
               type="button"
               onClick={() => canvasRef.current?.resetView()}
@@ -307,7 +482,7 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
                 </ul>
                 <button
                   type="button"
-                  onClick={() => handleAdd(selected)}
+                  onClick={() => handleAddAndPlace(selected)}
                   className="rounded bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950"
                 >
                   Add to build
@@ -316,7 +491,10 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
                   <p className="text-zinc-600">Adds it and shows it in the 3D view immediately.</p>
                 ) : caseLine ? (
                   <p className="text-zinc-600">
-                    Or click a highlighted zone in the 3D view to place it directly.
+                    Placed in the first free slot automatically — or click a highlighted zone in
+                    the 3D view to choose one.
+                    {selected.category.key !== "MOTHERBOARD" &&
+                      " (RAM, GPU and storage slots appear once a motherboard is placed.)"}
                   </p>
                 ) : (
                   <p className="text-zinc-600">Add a case first to enable 3D placement.</p>
@@ -363,6 +541,21 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
           </div>
 
           <div>
+            <h2 className="font-medium text-zinc-200">Build summary</h2>
+            <BuildSummary lines={buildLines} report={report} />
+          </div>
+
+          <div>
+            <h2 className="font-medium text-zinc-200">Airflow</h2>
+            <AirflowPanel placements={placements} />
+          </div>
+
+          <div>
+            <h2 className="font-medium text-zinc-200">Estimates</h2>
+            <EstimatesPanel lines={buildLines} placements={placements} />
+          </div>
+
+          <div>
             <h2 className="font-medium text-zinc-200">Compatibility</h2>
             {buildLines.length === 0 && (
               <p className="text-zinc-600">Add components to see compatibility checks.</p>
@@ -402,7 +595,9 @@ export function BuildWorkspace({ categories }: { categories: Category[] }) {
           Build summary:{" "}
           {buildLines.length === 0
             ? "no components yet"
-            : `${buildLines.reduce((sum, line) => sum + line.quantity, 0)} component(s)`}
+            : `${buildLines.reduce((sum, line) => sum + line.quantity, 0)} component(s), $${buildLines
+                .reduce((sum, line) => sum + line.price * line.quantity, 0)
+                .toFixed(2)}`}
         </span>
         <span>
           Estimated power:{" "}

@@ -17,6 +17,11 @@ export async function Nav() {
         <Link href="/workspace" className="text-sm text-zinc-400 hover:text-zinc-100">
           Workspace
         </Link>
+        {session?.user && (
+          <Link href="/builds" className="text-sm text-zinc-400 hover:text-zinc-100">
+            My builds
+          </Link>
+        )}
         {canAccessAdmin && (
           <Link href="/admin" className="text-sm text-zinc-400 hover:text-zinc-100">
             Admin

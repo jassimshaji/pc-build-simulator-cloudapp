@@ -10,9 +10,12 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Grid, OrbitControls, useGLTF } from "@react-three/drei";
 import { Box3, type Group as ThreeGroup } from "three";
+import { AirflowStream } from "./AirflowStream";
+import type { CameraState } from "./cameraState";
+import { fanMountFaceForZone } from "./airflow";
 import { createGenericCase } from "./procedural";
 import { mm } from "./procedural/units";
 import { extractCaseZoneSpec, extractMotherboardZoneSpec } from "./placement";
@@ -21,6 +24,12 @@ import { composeZone, generateCaseZones, generateMotherboardZones, type Installa
 
 export interface WorkspaceCanvasHandle {
   resetView: () => void;
+  // Key of the first unoccupied zone that accepts `category`, or null if
+  // there's none (no case yet, no motherboard for RAM/GPU slots, all full).
+  findFreeZone: (category: string) => string | null;
+  // The camera's current position and orbit target, for persisting with a
+  // saved build (null until the canvas has mounted).
+  getCameraState: () => CameraState | null;
 }
 
 // A component that has actually been placed somewhere in the 3D scene — the
@@ -60,6 +69,40 @@ export interface WorkspaceCanvasProps {
   // whether the currently selected component actually belongs there (this
   // package has no notion of "currently selected component", only zones).
   onZoneClick?: (zoneKey: string, acceptsCategory: string) => void;
+  // Stream animated particles through every placed fan, in the direction it
+  // moves air (Phase 6). Off by default so callers opt in.
+  showAirflow?: boolean;
+  // Restores a previously saved viewpoint on mount (see getCameraState). Only
+  // read once; "Reset view" still returns to the default framing.
+  initialCamera?: CameraState | null;
+}
+
+// Runs inside the Canvas (it needs the r3f store): records the default
+// framing as the OrbitControls reset state, then applies a saved camera on top
+// of it. OrbitControls captures its reset state at construction, before the
+// `target` prop lands, so without saveState() "Reset view" would aim at the
+// origin instead of the case.
+function CameraRig({ initialCamera }: { initialCamera?: CameraState | null }) {
+  const controls = useThree((state) => state.controls) as {
+    saveState: () => void;
+    update: () => void;
+    object: { position: { set: (x: number, y: number, z: number) => void } };
+    target: { set: (x: number, y: number, z: number) => void };
+  } | null;
+  const initialRef = useRef(initialCamera);
+
+  useEffect(() => {
+    if (!controls) return;
+    controls.saveState();
+    const saved = initialRef.current;
+    if (saved) {
+      controls.object.position.set(...saved.position);
+      controls.target.set(...saved.target);
+      controls.update();
+    }
+  }, [controls]);
+
+  return null;
 }
 
 // Places a generated group so its bounding-box bottom sits at y=0 (it stands
@@ -190,15 +233,28 @@ function ZoneMarker({
   placement,
   highlightCategory,
   onZoneClick,
+  showAirflow,
 }: {
   zone: InstallationZone;
   worldPosition: [number, number, number];
   placement?: PlacedComponent;
   highlightCategory?: string | null;
   onZoneClick?: (zoneKey: string, acceptsCategory: string) => void;
+  showAirflow?: boolean;
 }) {
   if (placement) {
-    return <PlacedComponentModel placement={placement} position={worldPosition} />;
+    return (
+      <>
+        <PlacedComponentModel placement={placement} position={worldPosition} />
+        {showAirflow && placement.categoryKey === "FAN" && fanMountFaceForZone(zone.key) && (
+          <AirflowStream
+            position={worldPosition}
+            face={fanMountFaceForZone(zone.key)!}
+            specifications={placement.specifications}
+          />
+        )}
+      </>
+    );
   }
 
   const isHighlighted = highlightCategory != null && zone.acceptsCategory === highlightCategory;
@@ -234,12 +290,14 @@ function ZoneMarkers({
   placements,
   highlightCategory,
   onZoneClick,
+  showAirflow,
 }: {
   zones: InstallationZone[];
   origin: [number, number, number];
   placements: Record<string, PlacedComponent>;
   highlightCategory?: string | null;
   onZoneClick?: (zoneKey: string, acceptsCategory: string) => void;
+  showAirflow?: boolean;
 }) {
   return (
     <>
@@ -255,6 +313,7 @@ function ZoneMarkers({
           placement={placements[zone.key]}
           highlightCategory={highlightCategory}
           onZoneClick={onZoneClick}
+          showAirflow={showAirflow}
         />
       ))}
     </>
@@ -271,11 +330,27 @@ function ZoneMarkers({
 // accepts the currently selected picker category — click-to-place per
 // ARCHITECTURE.md §7.1.
 export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
-  function WorkspaceCanvas({ caseComponent, placements = {}, highlightCategory, onZoneClick }, ref) {
+  function WorkspaceCanvas(
+    { caseComponent, placements = {}, highlightCategory, onZoneClick, showAirflow, initialCamera },
+    ref,
+  ) {
     const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+
+    // Assigned below, once the zone lists exist (hooks must run in a stable
+    // order, and the imperative handle needs both zone lists).
+    const findFreeZoneRef = useRef<(category: string) => string | null>(() => null);
 
     useImperativeHandle(ref, () => ({
       resetView: () => controlsRef.current?.reset(),
+      findFreeZone: (category: string) => findFreeZoneRef.current(category),
+      getCameraState: () => {
+        const controls = controlsRef.current;
+        if (!controls) return null;
+        return {
+          position: controls.object.position.toArray() as [number, number, number],
+          target: controls.target.toArray() as [number, number, number],
+        };
+      },
     }));
 
     const caseScene = useMemo(() => {
@@ -327,8 +402,23 @@ export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvas
       return generateMotherboardZones(zoneSpec).map((zone) => composeZone(zone, worldOrigin));
     }, [caseScene, motherboardPlacement]);
 
+    // First unoccupied zone (case zones, then the placed motherboard's own)
+    // that accepts `category` — what "Add to build" uses to auto-place a part.
+    useEffect(() => {
+      findFreeZoneRef.current = (category) => {
+        const zones = [...(caseScene?.zones ?? []), ...(motherboardZones ?? [])];
+        return (
+          zones.find((zone) => zone.acceptsCategory === category && !placements[zone.key])?.key ??
+          null
+        );
+      };
+    }, [caseScene, motherboardZones, placements]);
+
     return (
-      <Canvas camera={{ position: [5, 3.5, 8], fov: 50 }}>
+      // 1 scene unit = 1 meter, so a mid-tower (~0.46m tall) needs a camera
+      // about a meter away, aimed at its middle (see OrbitControls target below),
+      // not the ~10m-away default that made cases render as a speck.
+      <Canvas camera={{ position: [0.9, 0.6, 1.2], fov: 50, near: 0.05, far: 100 }}>
         <color attach="background" args={["#09090b"]} />
         <ambientLight intensity={0.9} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
@@ -351,6 +441,7 @@ export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvas
               placements={placements}
               highlightCategory={highlightCategory}
               onZoneClick={onZoneClick}
+              showAirflow={showAirflow}
             />
           </>
         )}
@@ -365,7 +456,15 @@ export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvas
           />
         )}
 
-        <OrbitControls ref={controlsRef} makeDefault enableDamping />
+        <CameraRig initialCamera={initialCamera} />
+        <OrbitControls
+          ref={controlsRef}
+          makeDefault
+          enableDamping
+          target={[0, 0.22, 0]}
+          minDistance={0.3}
+          maxDistance={6}
+        />
       </Canvas>
     );
   },

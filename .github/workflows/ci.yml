@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# One run per branch/PR at a time; a newer push cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: pcbuilder
+          POSTGRES_PASSWORD: pcbuilder
+          POSTGRES_DB: pcbuilder_test # the API + browser tests run against this database
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pcbuilder -d pcbuilder_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Read by apps/web/test-support/testDatabase.ts (also the default locally).
+      TEST_DATABASE_URL: postgresql://pcbuilder:pcbuilder@localhost:5432/pcbuilder_test?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The Prisma client must exist before any package that imports it can typecheck/build.
+      - run: pnpm --filter @pcbuilder/database run db:generate
+
+      - run: pnpm typecheck
+      - run: pnpm --filter web run lint
+
+      # Unit suites for every package + the web API integration tests (these apply
+      # migrations and seed the test database themselves).
+      - run: pnpm test
+
+      # Browser tests: builds the app and runs it against the same test database.
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      - run: pnpm --filter web test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7

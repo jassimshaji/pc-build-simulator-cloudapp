@@ -111,8 +111,14 @@ SeaweedFS server (also in `docs/DEVELOPMENT.md`).
 
 ## Running Tests
 
-Testing strategy is documented in `docs/DEVELOPMENT.md`. Compatibility-engine rules
-require full Vitest coverage per project requirements (Phase 3).
+```
+pnpm test                        # every package's Vitest suite + the web API integration tests
+pnpm --filter web test:e2e       # Playwright browser tests (builds + starts the app on :3100)
+```
+
+The web tests need a `pcbuilder_test` Postgres database — setup, layers and CI are
+documented in `docs/DEVELOPMENT.md` (Testing strategy). Every compatibility-engine
+rule requires Vitest coverage per project requirements.
 
 ## Deployment
 
