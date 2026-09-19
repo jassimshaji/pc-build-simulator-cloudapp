@@ -1,61 +1,87 @@
 # packages/three-d-engine
 
-React Three Fiber scene primitives, the installation-zone system, procedural generic
-3D model generators, click-to-place, and real GLTF asset loading — everything the
-`/workspace` 3D view needs.
+Everything the `/workspace` 3D view needs, plus the pure logic that sits next to it: the
+React Three Fiber canvas, procedural model generators, the installation-zone system,
+click-to-place, GLTF asset loading — and (Phases 5-6) build serialization, the build
+summary, fan airflow, thermal/noise/performance estimates and camera state.
 
-**Status:** Phase 4 complete (all 6 milestones).
+**Status:** complete through Phase 6. 135 Vitest tests (`pnpm --filter
+@pcbuilder/three-d-engine test`).
 
-- `src/WorkspaceCanvas.tsx`: the R3F `<Canvas>` (lighting, reference grid,
-  `OrbitControls`, a `WorkspaceCanvasHandle.resetView()` exposed via `ref`). Takes a
-  real `caseComponent` (rendered immediately — it's the root container) and
-  `placements: Record<zoneKey, PlacedComponent>`, and fires `onZoneClick(zoneKey,
-  acceptsCategory)` when an unoccupied, category-matching zone is clicked. Every
-  placed component (and the case itself) is resolved through
-  `resolveComponentAsset` — see below — so a real uploaded GLTF renders when one's
-  assigned, not just the procedural fallback. Consumed by
-  `apps/web/app/workspace/build-workspace.tsx` via `next/dynamic` with
-  `ssr: false` (WebGL needs a browser).
-- `src/procedural/`: one `createGenericX` function per component category (all 12 —
-  Case, Motherboard, CPU, GPU, RAM, PSU from Milestone 2; Fan, Radiator, AIO, Air
-  Cooler, SSD, Monitor, Case LCD from Milestone 5), each a pure function returning a
-  plain `THREE.Group` sized from real spec dimensions — no React/R3F dependency, so
-  they're directly Vitest-testable. Matches the signatures documented in
-  ARCHITECTURE.md §7.3 where one is given; a few (Monitor, Case LCD) have no
-  documented signature and use judgment matching the same pattern. Deliberately
-  generic/schematic geometry, never photorealistic (ADR-004) — there are no
-  licensed real-brand 3D assets to build from.
-- `src/zones/`: `InstallationZone` (matches ARCHITECTURE.md §7.2), `generateCaseZones`
-  and `generateMotherboardZones` (both pure, data-driven from spec fields — never
-  hand-authored per model), and `composeZone` (re-expresses a placed motherboard's
-  own zones in world space once it's sitting in a case's `MOBO_TRAY` zone).
-- `src/placement.ts`: `extractCaseZoneSpec`/`extractMotherboardZoneSpec` (real
-  `Component.specifications` → the zone generators' input shapes) and
-  `buildGenericModel(categoryKey, specifications)` — dispatches to the matching
-  procedural generator for any category, approximating the handful of params some
-  generators want that the schema doesn't track (documented per case) with a
-  fallback constant.
-- `src/resolveComponentAsset.ts` (Milestone 6): `resolveComponentAsset(categoryKey,
-  specifications, asset?)` — a pure, framework-agnostic function implementing
-  ARCHITECTURE.md §7.3's exact asset resolution order:
-  1. `asset.kind === "GLTF_MODEL"` with a real `url` → `{type: "gltf", url}`.
-  2. `asset.kind === "PLACEHOLDER"` → `{type: "placeholder"}`.
-  3. `asset.kind === "PROCEDURAL_FALLBACK"`, or no `asset` at all (no `ThreeDAsset`
-     row) → `{type: "procedural", model: buildGenericModel(...)}`. Case 3's "no
-     row" branch is the architecture doc's documented last-resort default, not a
-     placeholder — this is why a component created without ever visiting the 3D
-     asset manager keeps rendering its procedural shape exactly as before this
-     milestone.
-  `WorkspaceCanvas` renders whichever resolution applies: a real GLTF via
-  `@react-three/drei`'s `useGLTF` (cloned per placement, inside a `<Suspense>` +
-  error boundary that falls back to a plain marker on a broken/loading url), the
-  procedural model (unchanged), or the plain fallback marker for an explicit
-  PLACEHOLDER. The case itself (the root container the whole zone system is
-  positioned against, not a zone placement) is the one place outside the
-  placement system that resolves its own asset — its loading/error fallback is
-  the real procedural wireframe case rather than a generic marker, and an
-  explicit PLACEHOLDER on the case also falls back to that wireframe by design,
-  since the case must always render *something*.
+Only the files marked *(R3F)* need a browser/WebGL. Everything else is a pure function
+with no React or three.js scene dependency, which is why `apps/web` can import the pure
+modules directly by path (for example
+`@pcbuilder/three-d-engine/src/buildSerialization`) in server code and in client
+components without pulling the 3D bundle into the main chunk.
 
-See `../../project-management/DEVELOPMENT_ROADMAP.md` for the full Phase 4
-milestone list (now complete) and `../../project-management/ARCHITECTURE.md` §7.
+## Rendering
+
+- `src/WorkspaceCanvas.tsx` *(R3F)* — the `<Canvas>` (lighting, grid, `OrbitControls`).
+  Props: `caseComponent` (rendered immediately — it's the root container),
+  `placements: Record<zoneKey, PlacedComponent>`, `highlightCategory`,
+  `onZoneClick(zoneKey, acceptsCategory)`, `showAirflow`, `initialCamera`. The imperative
+  handle (`ref`) exposes `resetView()`, `findFreeZone(category)` (first unoccupied
+  compatible zone — what "Add to build" uses to auto-place) and `getCameraState()`.
+  Every placed component goes through `resolveComponentAsset` (below). Loaded by
+  `apps/web` with `next/dynamic` and `ssr: false`.
+  - The camera starts about a meter from the case (1 scene unit = 1 meter) aimed at its
+    middle; `CameraRig` records that as the reset state, then applies `initialCamera` if
+    a saved one was given, so "Reset view" always returns to the default framing.
+- `src/AirflowStream.tsx` *(R3F)* — animated particles through one placed fan, along the
+  axis of its mount face: orange = exhaust, blue = intake.
+- `src/procedural/` — one `createGenericX` per component category (all 12), each a pure
+  function returning a `THREE.Group` sized from real spec dimensions (mm → scene units
+  via `mm()`). Deliberately generic/schematic, never photorealistic (ADR-004).
+- `src/resolveComponentAsset.ts` — ARCHITECTURE.md §7.3's resolution order: a
+  `GLTF_MODEL` with a url loads the real file (Suspense + error boundary, cloned per
+  placement); `PLACEHOLDER` shows a plain marker; `PROCEDURAL_FALLBACK` or *no
+  `ThreeDAsset` row at all* uses the procedural generator. The case falls back to its
+  procedural wireframe in every case, since the zone system is positioned against it.
+
+## Zones and placement
+
+- `src/zones/` — `InstallationZone`, `generateCaseZones`, `generateMotherboardZones`,
+  `composeZone` (re-expresses a placed motherboard's zones in world space). All
+  data-driven from spec fields, never hand-authored per model.
+  - **Fan mounts** are `FAN_MOUNT_<n>`. The spec lists only supported fan *sizes*, so
+    `fanMountFace(index)` assigns faces in a fixed order — front, rear, top, then
+    cycling — and same-face mounts sit side by side. Airflow derives direction from this
+    same function, so layout and model can't drift apart (a test asserts it).
+- `src/placement.ts` — real `specifications` → zone-generator inputs, and
+  `buildGenericModel(categoryKey, specs)`.
+
+## Builds
+
+- `src/buildSerialization.ts` — `serializeBuild` / `deserializeBuild` convert between the
+  workspace's `{ quantity per component, zone → component }` and the database's flat
+  rows: **one row per physical unit**, with `UNPLACED` (`UNPLACED_ZONE_KEY`) for units
+  that are in the build but not in a zone.
+- `src/buildSummary.ts` — `summarizeBuild`: unit count, total price (rounded to cents),
+  missing essentials (CPU, motherboard, RAM, SSD, PSU, case — GPU is optional), and
+  compatibility issue counts.
+- `src/cameraState.ts` — `parseCameraState` / `cameraFromWorkspaceState`: validate the
+  camera stored in `PCBuild.workspaceState` (finite numbers within ±100, position ≠
+  target). Used by the API before storing and by the loaders when reading.
+
+## Simulation (Phase 6)
+
+- `src/airflow.ts` — fan direction (`fanFlowDirection(blade, face)`: normal blade intakes
+  at the front and exhausts at the rear/top, reverse blade flips), CFM (the spec's, or an
+  estimate from fan size), and `summarizeAirflow` → intake/exhaust/net CFM and case
+  pressure (`POSITIVE` / `NEGATIVE` / `BALANCED` within 10% / `NONE`); plus the particle
+  animation maths (`streamProgress`, `streamLoopsPerSecond`).
+- `src/estimates.ts` — rule-based **estimates, not simulations**:
+  - `estimateNoise` — case-fan levels added logarithmically (two equal fans ≈ +3 dB);
+    size-based fallback when a fan has no dBA figure.
+  - `estimateThermals` — load temperature ≈ 25 °C + heat ÷ cooling capacity × 60 °C ×
+    an airflow factor. Capacity comes from the air cooler's rating or the AIO radiator
+    size (a 65 W stock cooler when none is selected); clamped to 30-105 °C.
+  - `estimatePerformance` — a relative 0-100 score (65% GPU, 35% CPU; games favor clock
+    speed and cache over cores past 8) with a tier and CPU/GPU-bottleneck flag. Needs
+    both a CPU and a GPU. Not an FPS figure.
+
+All exports are re-exported from `src/index.ts`.
+
+See `../../project-management/DEVELOPMENT_ROADMAP.md` for the phase history and
+`../../project-management/ARCHITECTURE.md` §7 (and §11 for what changed since the
+original design).

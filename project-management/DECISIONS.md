@@ -243,3 +243,95 @@ remembering for any future fixture/import code): whenever two representations of
 the same data can exist (a full spec object and promoted columns derived from it),
 derive one from the other programmatically — never hand-maintain both, even for
 "just seed data."
+
+---
+
+## ADR-010: Builds are stored one row per unit, with an UNPLACED sentinel; workspaceState is sanitized
+
+**Context:** The workspace tracks a quantity per component plus a zone -> component map;
+the database has `BuildComponent` with a required `installedZoneKey`. The client also
+wants to persist the camera viewpoint, and `PCBuild.workspaceState` is a free-form JSON
+column that any authenticated client could otherwise fill with arbitrary data.
+
+**Decision:** Store **one `BuildComponent` row per physical unit**; a unit not placed in a
+3D zone (including the case, the root container) uses the zone key `UNPLACED`. The
+conversion is a pure, tested pair of functions in `packages/three-d-engine`
+(`serializeBuild` / `deserializeBuild`). The server recomputes the compatibility and power
+snapshot itself. `workspaceState` accepts only a validated camera
+(`sanitizeWorkspaceState` -> `parseCameraState`: finite numbers within +-100, position
+different from target) and silently drops anything else.
+
+**Consequences:** Round-tripping is lossless for what the UI can express; quantities are
+derived by counting rows. Clients can't smuggle data into `workspaceState` or fake a
+compatibility result. Extending `workspaceState` later means extending the sanitizer.
+
+---
+
+## ADR-011: Public sharing via an unguessable slug that is deleted on disable; non-owners get 404
+
+**Context:** Builds must be shareable by link without an account, and un-shareable
+again. Private builds must not be discoverable by id.
+
+**Decision:** Enabling sharing sets `isShared` and a random 12-character URL-safe
+`shareSlug` (`crypto.randomBytes(9)`, 72 bits), idempotent while shared. Disabling sets
+`isShared = false` **and clears the slug**, so a revoked link can never work again and
+re-enabling issues a different one. The public page (`/shared/[slug]`) resolves only when
+`isShared` and the slug match. Every access to a build by someone other than its owner —
+admins included — returns `404`, never `403`.
+
+**Consequences:** Links can be revoked reliably; ids can't be probed. Owners can't keep a
+stable link across an off/on cycle (deliberate).
+
+---
+
+## ADR-012: Fan mount faces come from one rule shared by the zone generator and the airflow model
+
+**Context:** A case spec lists only the supported fan *sizes*, not where they mount, yet
+airflow needs each fan's face to know whether it intakes or exhausts.
+
+**Decision:** `fanMountFace(index)` (in `generateCaseZones.ts`) assigns `FAN_MOUNT_<n>`
+faces in a fixed, conventional order — front, rear, top, then cycling. The zone generator
+uses it to position mounts; `airflow.ts` uses the same function to derive direction (a
+normal blade intakes at the front and exhausts at the rear/top; a reverse blade flips
+it). A test asserts the zone positions match the declared faces.
+
+**Consequences:** A typical two-fan case gets front intake + rear exhaust with no data
+changes. The assignment is a convention, not real case geometry; if case specs later
+carry real mount locations, this one function is what changes.
+
+---
+
+## ADR-013: Thermal, noise and performance figures are labelled rule-based estimates
+
+**Context:** The roadmap listed thermal simulation, noise and performance estimation as
+post-MVP, "rule-based first". There is no measured data in the component specs to base a
+real simulation on.
+
+**Decision:** Implement small, documented heuristics in `packages/three-d-engine/src/estimates.ts`
+(logarithmic dBA addition; temperature from heat / cooling capacity x airflow factor;
+a relative 0-100 performance score) and label them in the UI as rough estimates, with
+performance explicitly *not* an FPS figure. The functions are pure, so a real model can
+replace them without touching callers.
+
+**Consequences:** Useful for comparing builds, honest about accuracy. Numbers should not
+be presented as benchmarks; only case fans count for noise/airflow, and the first CPU/GPU
+in a build is used.
+
+---
+
+## ADR-014: API tests call route handlers against a real Postgres test database; browser tests run on a production build
+
+**Context:** Mocking Prisma in route tests would hide exactly the bugs that matter here
+(constraints, cascades, unique keys). One such bug — a 500 when deleting a component
+that a saved build uses — was found by the first real-database test.
+
+**Decision:** `apps/web/tests` (Vitest) import the exported route handlers and call them
+with real `Request` objects against a separate `pcbuilder_test` database that is migrated
+and seeded before each run. Only `requireRole` is replaced (a stand-in enforcing the same
+401/403 contract); the real one has its own test. `apps/web/e2e` (Playwright) builds and
+starts the app on port 3100 against the same database. CI provides Postgres as a service
+container and runs everything.
+
+**Consequences:** Tests exercise real SQL behavior and are reproducible locally and in CI.
+Cost: a Postgres database is required to run the web tests, and the seeded SKUs are part
+of the tests' contract.

@@ -434,3 +434,64 @@ Developer → GitHub → GitHub Actions (lint/typecheck/test) → Vercel (build 
 | Power estimation accuracy | Starts as a rule-based sum + headroom multiplier (documented assumption, not marketed as precise); architecture leaves room for refining per-component draw curves later without touching the engine's public API. |
 | Scope creep across 13 component categories + advanced simulation | Roadmap strictly sequences: auth/inventory/compatibility (text-only) → 3D workspace with 2-3 categories end-to-end → remaining categories → simulation/airflow. See `DEVELOPMENT_ROADMAP.md`. |
 | Large GLTF assets hurting load performance | Lazy loading, Draco compression requirement, per-asset size cap enforced at upload. |
+
+---
+
+## 11. As-built notes (Phases 5-6 and testing)
+
+The sections above are the original design. This records where the built system extends
+or departs from it.
+
+**Saved builds (extends §4.2).** `PCBuild` / `BuildComponent` are written by
+`apps/web/app/api/builds/*`. A build's components are stored **one row per physical unit**
+(three identical RAM kits = three rows); `installedZoneKey` is a zone key or the sentinel
+`UNPLACED` (the case is always `UNPLACED` — it is the root container, not a zone
+occupant). `packages/three-d-engine/src/buildSerialization.ts` converts to and from the
+workspace's `{ quantity per component, zone -> component }` shape. `compatibilityStatus`
+and `estimatedPowerWatts` are **server-computed snapshots**, recomputed on every create
+and on every update that replaces the components — the client never supplies them.
+`workspaceState` holds only a validated camera (`{ camera: { position, target } }`);
+anything else a client sends is dropped. See ADR-010.
+
+**Sharing.** `POST /api/builds/:id/share` sets `isShared` and mints a random 12-character
+URL-safe `shareSlug` (72 bits); disabling clears the slug so an old link can never be
+revived. `/shared/[slug]` is a public, read-only page that resolves only when
+`isShared` is true and the slug matches. Every non-owner access to a private build is a
+`404`, not `403`, so ids can't be probed (even for admins). See ADR-011.
+
+**3D engine (extends §7).**
+- The pure logic lives beside the renderer in `packages/three-d-engine`: build
+  serialization, build summary, camera state, airflow and estimates. Only
+  `WorkspaceCanvas.tsx` and `AirflowStream.tsx` need WebGL.
+- "Add to build" auto-places into the first free compatible zone
+  (`WorkspaceCanvasHandle.findFreeZone`); clicking a zone still works for choosing a slot.
+- Fan mounts (`FAN_MOUNT_<n>`) are assigned faces front, rear, top (cycling) by
+  `fanMountFace(index)`, because the case spec lists only supported fan sizes. Airflow
+  derives fan direction from that same function (ADR-012).
+- Scale is 1 scene unit = 1 meter; the default camera is about a meter from the case,
+  aimed at its middle, and `CameraRig` records that as the "Reset view" state.
+
+**Simulation (§7 mentioned airflow only as a future item).** Case pressure, fan flow
+direction and animated particles are implemented. Thermal, noise and performance are
+**rule-based estimates**, not simulations (`estimates.ts`), and are labelled as such in
+the UI (ADR-013).
+
+**Security (§9) — what is and isn't implemented.** Implemented: `bcryptjs` password
+hashing, `requireRole()` on every gated route (plus `proxy.ts` for `/admin`), Zod
+validation on every mutating route, presigned-URL uploads with a content-type
+allowlist and a sanitized object key. **Not implemented**, contrary to the text above:
+magic-byte sniffing, enforced upload size limits (presigned PUTs can't enforce them —
+the constants in `lib/storage.ts` are advisory) and rate limiting on auth/upload routes.
+Acceptable while uploads are admin-only; revisit before a public launch.
+
+**UI kit (§1).** shadcn/ui was planned but never adopted; the UI is plain Tailwind CSS
+components, which has been sufficient.
+
+**CI/CD (§8).** GitHub Actions is implemented (`.github/workflows/ci.yml`): Postgres
+service, typecheck, lint, all unit + API-integration tests, and Playwright. The Vercel
+deploy is still only a design.
+
+**Testing.** Unit tests per package; API integration tests in `apps/web/tests` call the
+route handlers against a separate real Postgres test database (only `requireRole` is
+replaced); Playwright tests in `apps/web/e2e` run against a production build. See
+ADR-014 and `docs/DEVELOPMENT.md`.

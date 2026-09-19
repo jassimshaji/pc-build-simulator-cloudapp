@@ -1,8 +1,10 @@
 # Development Guide
 
-## Local setup (current — Phase 1, Milestone 1 scope)
+## Local setup
 
-Requires Node.js 20+ (LTS) and pnpm (`corepack enable` or `npm i -g pnpm`).
+Requires Node.js 20+ (LTS; `.nvmrc` says 20 — newer versions work too), pnpm (the exact
+version is pinned in `package.json`; `corepack enable` or `npm i -g pnpm@<version>`) and
+PostgreSQL 17+.
 
 ```
 pnpm install
@@ -10,14 +12,22 @@ pnpm dev              # runs apps/web via Turborepo -> http://localhost:3000
 ```
 
 Other root scripts: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` — each
-runs across every workspace package via Turborepo.
+runs across every workspace package via Turborepo. Browser tests: `pnpm --filter web
+test:e2e` (see Testing strategy below).
 
-`apps/web` is a real app (auth, admin CRUD, component APIs — see below).
-`packages/database` and `packages/component-models` have real code;
-`packages/compatibility-engine`, `packages/three-d-engine`, and `packages/shared`'s
-non-`apiResponse` parts are still stubs pending Phases 3-4.
+Every package is real and tested; the project has completed all roadmap phases (0-6).
+The first-run steps are the three sections that follow: the database, the web app's
+environment file, and (optionally) object storage. In short:
 
-## Database (Phase 1, Milestone 2 — done)
+```
+cp packages/database/.env.example packages/database/.env
+cp apps/web/.env.example apps/web/.env.local     # fill in DATABASE_URL + NEXTAUTH_SECRET
+pnpm --filter @pcbuilder/database run db:migrate
+pnpm --filter @pcbuilder/database run db:seed
+pnpm dev
+```
+
+## Database
 
 Requires a local Postgres (either `docker compose -f docker/docker-compose.yml up -d`,
 or a natively installed server). See `docs/DATABASE.md` for full schema/setup detail.
@@ -29,7 +39,7 @@ pnpm --filter @pcbuilder/database run db:seed      # seed categories/brands/comp
 pnpm --filter @pcbuilder/database run db:studio    # optional: browse data in Prisma Studio
 ```
 
-## Auth (Phase 1, Milestone 3 — done)
+## Auth
 
 `apps/web` needs its own env file (Next.js reads env vars from the app's own
 directory, not the monorepo root):
@@ -42,13 +52,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 Then `pnpm dev` and visit `/register` to create an account, `/login` to sign in, `/`
 shows session state, `/admin` is gated to `ADMIN`/`INVENTORY_MANAGER` roles (redirects
-everyone else). To promote a user to admin for local testing (no admin UI yet):
+everyone else). There is no UI for changing roles, so promote a user in the database
+(the role is signed into the session at login — sign out and back in afterwards):
 
 ```sql
 UPDATE "User" SET role = 'ADMIN' WHERE email = 'you@example.com';
 ```
 
-## Object storage / image uploads (Phase 2, Milestone 3 — done)
+## Object storage / image and model uploads
 
 Component image uploads need an S3-compatible object store. Production targets
 Cloudflare R2 (ARCHITECTURE.md §8); locally this runs against a self-hosted
@@ -94,21 +105,14 @@ self-discovered the machine's LAN IP instead of `127.0.0.1`, or vice versa). Fix
 stop `weed.exe`, delete the contents of `C:\seaweedfs\data`, and restart — it's a
 fresh local dev store, safe to reset (re-upload anything you need afterward).
 
-**Troubleshooting — `-s3.config` path with spaces (e.g. under `C:\Users\Some
-Name\...`):** when starting `weed.exe` via a script/API rather than typing the
-command directly in a terminal (e.g. PowerShell's `Start-Process -ArgumentList`),
-an unquoted path containing a space gets truncated at the space by `weed.exe`'s own
-flag parser, silently pointing it at the wrong (nonexistent) config file. Wrap the
-whole `-s3.config=...` argument in one string with embedded literal double quotes
-around the path, e.g. `'-s3.config="C:\Users\Some Name\...\s3-config.json"'` as a
-single array element — not `-s3.config=`, `"C:\Users\Some Name\..."` as two.
-
-**Troubleshooting — every presigned upload gets 403 `InvalidAccessKeyId` and the server
-log says "Available keys: 0" / ignores `-ip` and the port flags:** the S3 identities were
-never loaded because `weed.exe` was silently ignoring flags. On a machine whose user path
-contains a space, either (a) pass every path as an 8.3 short name (`C:\Users\ANANDB~1\...`;
-get one via `(New-Object -ComObject Scripting.FileSystemObject).GetFolder($path).ShortPath`),
-and (b) launch it with `Start-Process -ArgumentList @(...)` rather than the `&` call
+**Troubleshooting — paths with spaces (e.g. `C:\Users\Some Name\...`), every presigned
+upload gets 403 `InvalidAccessKeyId`, and the server log says "Available keys: 0" or
+shows it ignored `-ip` and the port flags:** the S3 identities were never loaded because
+`weed.exe` was silently ignoring flags. Wrapping the `-s3.config` path in embedded quotes
+was tried and does **not** reliably fix it. What works: (a) pass every path as an 8.3 short
+name (`C:\Users\ANANDB~1\...`; get one via
+`(New-Object -ComObject Scripting.FileSystemObject).GetFolder($path).ShortPath`), and
+(b) launch it with `Start-Process -ArgumentList @(...)` rather than the `&` call
 operator. If port 8080 is already taken (`Get-NetTCPConnection -State Listen -LocalPort
 8080`), use different `-volume.port`/`-filer.port` values (e.g. 9080/9888) — S3 stays on
 8333 so `.env.local` doesn't change. A ready-made launcher for this is kept outside the

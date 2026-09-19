@@ -190,25 +190,43 @@ Milestones (each independently shippable):
 ---
 
 ## PHASE 5 — Build Management
-1. `[ ]` Save/load/rename/duplicate/delete builds, persisting `workspaceState`
-   (camera) and `BuildComponent` placements.
-2. `[ ]` Build sharing (share slug, read-only public view).
-3. `[ ]` Build summary panel: component list, compatibility status, power estimate.
+1. `[x]` Save/load/rename/duplicate/delete builds, persisting `workspaceState`
+   (camera) and `BuildComponent` placements. **Done 2026-09-19** — `/api/builds`,
+   `/builds`, one row per unit + `UNPLACED` (ADR-010), server-computed snapshots, camera
+   saved and restored.
+2. `[x]` Build sharing (share slug, read-only public view). **Done 2026-09-19** —
+   `POST /api/builds/:id/share`, `/shared/[slug]` (ADR-011).
+3. `[x]` Build summary panel: component list, compatibility status, power estimate.
+   **Done 2026-09-19** — also total price and missing essentials.
+
+**PHASE 5 IS NOW COMPLETE.**
 
 ---
 
 ## PHASE 6 — Simulation Features (visual/rule-based first)
 1. `[x]` Fan orientation (intake/exhaust, forward/reverse blade) visualization + case
-   pressure summary (positive/negative/neutral).
+   pressure summary (positive/negative/neutral). **Done 2026-09-19** — front/rear/top
+   mounts (ADR-012), net CFM, Airflow panel.
 2. `[x]` Simple airflow visualization (animated particles or directional arrows along
-   defined intake→exhaust paths).
-3. `[x]` (Future/backlog, not MVP) Thermal simulation, FPS/performance estimation,
-   noise estimation — architecture should not need to change to add these, but they
-   are explicitly out of scope until the MVP above is solid.
+   defined intake→exhaust paths). **Done 2026-09-19** — `AirflowStream`, "Show airflow".
+3. `[x]` (Was backlog, post-MVP) Thermal, performance and noise estimation. **Done
+   2026-09-19** as labelled rule-based estimates (ADR-013) — not simulations or benchmarks.
+
+**PHASE 6 IS NOW COMPLETE.**
 
 ---
 
-## MVP Definition (target: end of Phase 5)
+## Cross-cutting work (all done)
+- `[x]` Testing: unit (3 packages), API integration against a real Postgres test database,
+  and Playwright critical flows (ADR-014).
+- `[x]` Documentation: API, database, development, deployment and per-package READMEs
+  brought up to date; ARCHITECTURE.md gained an as-built section (§11).
+- `[x]` CI: GitHub Actions (Postgres service, typecheck, lint, all tests, Playwright);
+  passing on `main`.
+
+---
+
+## MVP Definition (target: end of Phase 5 — met)
 A user can register/login, browse components with full specs, assemble a build in the
 3D workspace with at least Case/Motherboard/CPU/RAM/GPU/PSU/Storage/Cooling/Fans,
 get live compatibility + power feedback, save and reload the build, and an admin can

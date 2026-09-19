@@ -4,19 +4,46 @@ Pure TypeScript, framework-agnostic compatibility rule engine and power calculat
 Single source of truth for all compatibility logic — never duplicate rules in the UI
 or API layer.
 
-**Status:** scaffold + rules + power calculator (Phase 3, Milestones 1-3).
-`src/types.ts` has the `CompatibilityResult`/`CompatibilityReport`/
-`CompatibilityRule` shapes from `../../project-management/ARCHITECTURE.md` §6,
-plus `BuildComponentInput`/`CompatibilityCheckInput` describing the engine's
-plain-data input. `src/engine.ts` has the real `runCompatibilityCheck()` entry
-point, running all 15 rules under `src/rules/` (`cpuSocket`, `ramCompatibility`,
-`gpuClearance`, `caseFormFactor`, `coolingCompatibility`, `storageInterface`,
-`psuPower`), aggregating an `overallStatus`, and returning real
-`estimatedPowerWatts`/`recommendedPsuWattage` from `src/powerCalculator.ts`
-(`estimateSystemPower`/`calculateRecommendedPsuWattage`, 1.25 default headroom
-multiplier).
+**Status:** complete (Phase 3). 15 rules, a power calculator, 74 Vitest tests, and it is
+wired into the app: `apps/web/lib/compatibility.ts` maps real component rows into the
+engine's plain-data input, `POST /api/compatibility/check` exposes it, and the
+`/workspace` panel and every saved build's stored snapshot come from it.
 
-`/api/compatibility/check` + a text-only build flow UI in `apps/web` (Milestone
-4) are next — the first Phase 3 milestone that touches the web app. See
-`../../project-management/DEVELOPMENT_ROADMAP.md` for the full Phase 3 milestone
-list.
+## API
+
+`runCompatibilityCheck(input)` (`src/engine.ts`) runs every registered rule and returns a
+`CompatibilityReport`: `{ overallStatus: "OK" | "WARNING" | "ERROR", results, estimatedPowerWatts,
+recommendedPsuWattage }`. Each `CompatibilityResult` has `ruleKey`, `compatible`,
+`severity` (`INFO` / `WARNING` / `ERROR`), a human-readable `message` and the
+`affectedComponents`. The input types (`BuildComponentInput`, `CompatibilityCheckInput`)
+are plain data — deliberately independent of Prisma and UI types (`src/types.ts`).
+
+## Rules (`src/rules/`, registered in `rules/index.ts`)
+
+| File | Rule keys |
+| --- | --- |
+| `cpuSocket.ts` | `cpuSocket` |
+| `ramCompatibility.ts` | `ramTypeMatch`, `ramCapacity`, `ramModuleCount` |
+| `gpuClearance.ts` | `gpuLengthClearance`, `gpuSlotWidth` |
+| `caseFormFactor.ts` | `caseFormFactor` |
+| `coolingCompatibility.ts` | `airCoolerSocketSupport`, `aioCoolerSocketSupport`, `airCoolerClearance`, `aioRadiatorMountSupport` |
+| `storageInterface.ts` | `m2SlotAvailability`, `sataPortAvailability` |
+| `psuPower.ts` | `psuWattage`, `psuConnectors` |
+
+A rule returns `null` when the categories it needs aren't both present, otherwise a
+result — `INFO` when compatible, `ERROR` for hard physical/electrical failures (socket,
+clearance, wattage) and `WARNING` for softer proxy checks (GPU slot width, AIO
+radiator mount matching, PSU connector counts).
+
+## Power calculator (`src/powerCalculator.ts`)
+
+`estimateSystemPower(build)` sums the real CPU `tdpWatts` and GPU `powerDrawWatts` plus
+small documented constants for what the schema has no power figure for (motherboard,
+per RAM module, per SSD, per fan, AIO pump). `calculateRecommendedPsuWattage()` applies
+a default 1.25 headroom multiplier.
+
+Every rule must have unit tests (a project requirement) — `tests/` has one file per rule
+module plus engine and calculator tests. Run: `pnpm --filter @pcbuilder/compatibility-engine test`.
+The web app additionally checks the rules end to end in `apps/web/tests/compatibility.test.ts`
+using the seeded parts (an AM5 CPU on an LGA1700 board, DDR4 on DDR5, a 358 mm GPU in a
+Mini-ITX case, an undersized PSU, ...).

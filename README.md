@@ -1,131 +1,185 @@
 # PC Builder Platform
 
-A cloud-based 3D PC building simulation and component inventory management system.
-Browse real/configurable PC components, assemble a build in an interactive 3D
-workspace, get live compatibility and power-draw feedback, and save/share builds. An
-admin dashboard manages the component catalog, stock, and 3D assets.
+A cloud-based 3D PC building simulator and component inventory system. Browse a
+catalog of real PC parts, assemble a build in an interactive 3D workspace, get live
+compatibility and power-draw feedback, see how the case breathes (fan direction,
+pressure, airflow) and rough thermal/noise/performance estimates, then save and share
+the build. An admin area manages the catalog, stock, and 3D assets.
 
-**Project status:** Phases 0-4 complete (architecture, core app foundation,
-component inventory, compatibility engine + power calculator, 3D workspace
-foundation); Phase 5 (Build Management — save/load/share) is next. See
-`project-management/PROJECT_STATUS.md` for the live status and
-`project-management/SESSION_CHECKPOINT.md` for exact resume instructions.
+**Status:** Phases 0-6 are complete — every phase in the roadmap. What remains is
+polish and post-MVP ideas (see [Known limitations](#known-limitations)). CI runs
+typecheck, lint, all unit/integration tests and the browser tests on every push.
+Live status: [`project-management/PROJECT_STATUS.md`](project-management/PROJECT_STATUS.md).
 
-## Project Overview
+## Features
 
-See `project-management/ARCHITECTURE.md` for the full architecture (tech stack,
-database design, compatibility engine, 3D engine, cloud deployment) and
-`project-management/DEVELOPMENT_ROADMAP.md` for the phased build plan and MVP
-definition.
+**For builders**
+- **Browse and search** the catalog by category, brand, text and price, with full
+  specifications for every part (12 categories: CPU, motherboard, GPU, RAM, SSD, PSU,
+  case, air cooler, AIO, fan, monitor, case LCD).
+- **3D workspace** (`/workspace`): add a case and it appears immediately; every other
+  part is drawn as a procedural model sized from its real specs (or an uploaded
+  `.glb`). "Add to build" drops a part into the first free compatible slot, or select a
+  part, click a highlighted zone and it snaps there. Orbit / zoom / pan, "Reset view".
+- **Live compatibility + power**: 15 rules (CPU socket, RAM type/capacity/modules, GPU
+  length/slot width, case form factor, cooler socket/clearance/radiator mount, M.2/SATA
+  ports, PSU wattage/connectors) re-check on every change, with an estimated power draw
+  and recommended PSU size.
+- **Build summary**: component count, total price, power, issue counts, and which
+  essentials (CPU, motherboard, RAM, SSD, PSU, case) are still missing.
+- **Airflow**: fans mount on the front, rear and top; a normal fan intakes at the front
+  and exhausts at the rear/top, a reverse-blade fan flips that. The panel reports net
+  CFM and positive / negative / balanced case pressure, and animated particles show each
+  fan's direction (toggle "Show airflow").
+- **Estimates** (rule-based, clearly labelled rough): CPU/GPU load temperature from
+  cooler capacity and case airflow, case-fan noise (dBA, summed logarithmically) and a
+  relative 0-100 performance score with CPU/GPU bottleneck detection.
+- **Save and manage builds** (`/builds`): save, reopen (including your camera
+  viewpoint), rename, duplicate, delete.
+- **Share**: turn on sharing to get an unguessable link (`/shared/<slug>`) anyone can
+  open in a read-only view — no account needed. Turning sharing off kills the link.
 
-## Technology Stack
+**For admins** (`ADMIN` / `INVENTORY_MANAGER`, at `/admin`)
+- Inventory dashboard: stat tiles, search, low/out-of-stock views, inline stock editor.
+- Component CRUD through a dynamic per-category form generated from the Zod schemas,
+  with image upload to S3-compatible storage.
+- Brand and category management, CSV import/export (upsert by SKU, per-row error
+  reporting), and a 3D asset manager (upload a GLTF/GLB, pick a procedural generator, or
+  mark a placeholder; record source/license/attribution).
 
-- **Frontend:** Next.js (App Router), React, TypeScript, Tailwind CSS, shadcn/ui
-- **3D:** Three.js, React Three Fiber, @react-three/drei
-- **Backend:** Next.js API route handlers, business logic in framework-agnostic
-  `packages/*`
-- **Database:** PostgreSQL via Prisma
-- **Auth:** Auth.js (Credentials + JWT, role-based access: USER / ADMIN / INVENTORY_MANAGER)
-- **Object storage:** Cloudflare R2 (component images, GLTF/GLB 3D models)
-- **Hosting:** Vercel (app) + Neon (Postgres) + Cloudflare R2 (storage)
+## Technology
 
-Full justification for each choice is in `project-management/ARCHITECTURE.md` §1 and
-`project-management/DECISIONS.md`.
+| Area | Choice |
+| --- | --- |
+| Frontend | Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS 4 |
+| 3D | three.js, React Three Fiber, `@react-three/drei` |
+| Backend | Next.js route handlers; business logic in framework-agnostic `packages/*` |
+| Database | PostgreSQL via Prisma 6 |
+| Auth | next-auth v4 (Credentials + JWT) with roles `USER` / `ADMIN` / `INVENTORY_MANAGER` |
+| Validation | Zod, at every API boundary |
+| Object storage | S3-compatible: SeaweedFS locally, Cloudflare R2 in production |
+| Tests | Vitest (unit + API integration), Playwright (browser) |
+| Monorepo | pnpm workspaces + Turborepo, GitHub Actions CI |
+| Target hosting | Vercel (app) + Neon (Postgres) + Cloudflare R2 — a design, **not yet deployed** |
 
-## Repository Structure
+Why each choice was made: [`project-management/ARCHITECTURE.md`](project-management/ARCHITECTURE.md)
+§1 and [`project-management/DECISIONS.md`](project-management/DECISIONS.md).
+
+## Repository structure
 
 ```
-pc-builder-platform/
-├── apps/web/                    # Next.js app (UI + API routes)
-├── packages/
-│   ├── database/                # Prisma schema, migrations, seed scripts
-│   ├── compatibility-engine/    # Pure TS compatibility rule engine
-│   ├── component-models/        # Shared TS types / Zod schemas per component category
-│   ├── three-d-engine/          # R3F scene primitives + procedural 3D model generators
-│   └── shared/                  # Cross-cutting utilities
-├── project-management/          # Development continuity system (status, roadmap, checkpoints)
-├── docs/                        # API / database / development / deployment docs
-├── infrastructure/              # Env/provider setup notes
-├── scripts/                     # Dev scripts (seeding, CSV import/export helpers)
-└── docker/                      # docker-compose for local Postgres
+apps/web/                    Next.js app: pages, API routes, lib/, components/
+  app/                       routes (workspace, builds, shared/[slug], admin/*, api/*)
+  tests/                     API integration tests (Vitest, real Postgres test DB)
+  e2e/                       critical-flow browser tests (Playwright)
+  test-support/              test-database preparation shared by both
+packages/
+  database/                  Prisma schema, migrations, seed
+  component-models/          Zod schemas per component category + hot-field extraction
+  compatibility-engine/      Pure TS rule engine + power calculator
+  three-d-engine/            R3F canvas, procedural generators, installation zones, and the
+                             pure logic behind builds, airflow, estimates and camera state
+  shared/                    API response envelope
+project-management/          Roadmap, status, decisions, changelog, session checkpoints
+docs/                        API, database, development, deployment, architecture summary
+infrastructure/              Local object-storage (SeaweedFS) config
+docker/                      docker-compose for a local Postgres
+.github/workflows/ci.yml     CI
 ```
 
-## Installation & Running Locally
+## Getting started
 
-Requires Node.js 20+ and pnpm.
+Requires **Node.js 20+** (`.nvmrc`), **pnpm** (the version is pinned in `package.json`;
+`corepack enable` picks it up) and **PostgreSQL 17+**.
 
-```
+```bash
 pnpm install
-pnpm dev          # starts apps/web at http://localhost:3000
+
+# 1. Database: create a role/database (see docs/DATABASE.md), then
+cp packages/database/.env.example packages/database/.env
+pnpm --filter @pcbuilder/database run db:migrate
+pnpm --filter @pcbuilder/database run db:seed     # 12 categories, 11 brands, 20 components
+
+# 2. App environment
+cp apps/web/.env.example apps/web/.env.local     # set DATABASE_URL and a NEXTAUTH_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# 3. Run
+pnpm dev                                         # http://localhost:3000
 ```
 
-Other useful root scripts (run via Turborepo across all workspace packages):
+Register at `/register`, then open `/workspace`. To try the admin area, promote your
+account (the role is read at login, so sign in again afterwards):
 
-```
-pnpm build        # build all packages/apps
-pnpm typecheck     # typecheck all packages/apps
-pnpm lint          # lint all packages/apps
-pnpm test          # run tests in all packages/apps
+```sql
+UPDATE "User" SET role = 'ADMIN' WHERE email = 'you@example.com';
 ```
 
-`apps/web` has working registration/login, sessions (next-auth v4, JWT strategy
-carrying the user's role), a session-aware top nav, and a real admin area at
-`/admin`: an inventory dashboard (stat tiles, search, low/out-of-stock views, an
-inline stock-quantity editor) plus full CRUD for components through a dynamic
-per-category form (generated from `@pcbuilder/component-models`'s Zod schemas) with
-image upload to S3-compatible object storage, standalone brand/category
-management (`/admin/brands`, `/admin/categories`), CSV import/export
-(`/admin/import-export`), and a 3D asset manager
-(`/admin/components/:id/asset`) for assigning GLTF/GLB uploads or procedural
-fallback generators per component. **Phase 2 (Component Inventory System) is
-complete.** `packages/compatibility-engine` has 15 real compatibility rules
-(CPU↔socket, RAM↔motherboard, GPU↔case/motherboard, case↔motherboard form
-factor, cooling↔CPU/case, storage interface availability, PSU
-wattage/connectors) plus a power calculator, all running through
-`runCompatibilityCheck()`. The `/workspace` route is now a real, interactive
-build flow: browse/search real components, add them to a build, and see live
-compatibility results and estimated power update via
-`POST /api/compatibility/check`. **Phase 3 (Compatibility Engine & Power
-Calculation) is complete.** `packages/database` has a real Prisma schema,
-migration, and seed data (see `docs/DATABASE.md`). `packages/three-d-engine`
-now has a real React Three Fiber canvas (lighting, a reference grid, orbit/
-zoom/pan/reset camera controls), a data-driven installation zone system, and
-genuine click-to-place: add a case in `/workspace` and it renders immediately,
-select a component and its matching 3D zones highlight, click one to snap it
-into place — which re-runs the real Phase 3 compatibility check and updates
-the panel. All 12 component categories now have a real procedural generator
-(Case, Motherboard, CPU, GPU, RAM, PSU, Fan, Radiator, AIO, Air Cooler, SSD,
-Monitor, Case LCD), so every placed component renders as its actual generated
-shape rather than a placeholder marker. An admin-uploaded `.glb` (assigned
-via the 3D asset manager) now actually overrides the procedural fallback too —
-`resolveComponentAsset` resolves each component's real `ThreeDAsset` row and
-loads real GLTF files lazily via `@react-three/drei`'s `useGLTF`, with a
-Suspense/error-boundary fallback for loading or broken assets.
-**Phase 4 (3D Workspace Foundation) is complete.** Build save/load/share is
-the next phase. See `project-management/PROJECT_STATUS.md` for live status.
+Image and 3D-model uploads need an S3-compatible server; locally that is SeaweedFS —
+setup (including a Windows gotcha with paths containing spaces) is in
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md). Nothing else depends on it.
 
-Setup requires a local PostgreSQL server (`docs/DATABASE.md`), an
-`apps/web/.env.local` (`docs/DEVELOPMENT.md` has the exact steps, including
-generating an auth secret), and — only if you need image upload to work — a local
-SeaweedFS server (also in `docs/DEVELOPMENT.md`).
+### Root scripts
 
-## Running Tests
-
-```
-pnpm test                        # every package's Vitest suite + the web API integration tests
-pnpm --filter web test:e2e       # Playwright browser tests (builds + starts the app on :3100)
+```bash
+pnpm dev         # run apps/web
+pnpm build       # build every package and the app
+pnpm typecheck   # typecheck everything (the web app runs `next typegen` first)
+pnpm lint        # lint
+pnpm test        # all Vitest suites, incl. the web API integration tests
+pnpm --filter web test:e2e   # Playwright browser tests
 ```
 
-The web tests need a `pcbuilder_test` Postgres database — setup, layers and CI are
-documented in `docs/DEVELOPMENT.md` (Testing strategy). Every compatibility-engine
-rule requires Vitest coverage per project requirements.
+## Testing
 
-## Deployment
+| Layer | Where | Count |
+| --- | --- | --- |
+| Unit | `packages/component-models`, `compatibility-engine`, `three-d-engine` | 243 |
+| API integration (Vitest, real Postgres) | `apps/web/tests` | 64 |
+| Browser (Playwright) | `apps/web/e2e` | 13 |
 
-See `docs/DEPLOYMENT.md` for the target cloud architecture (Vercel + Neon + Cloudflare R2).
+The web tests use their own `pcbuilder_test` database (create it once —
+`CREATE DATABASE pcbuilder_test OWNER pcbuilder;`); migrations and seed are applied
+automatically before each run. Details, layers and troubleshooting:
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#testing-strategy). Every compatibility rule
+is required to have unit-test coverage.
 
-## Continuing Development
+## Documentation
 
-This project uses a session-continuity system under `project-management/`. To resume
-work in a new session, say "Continue" or "Resume development" — read
-`project-management/SESSION_CHECKPOINT.md` first for exact state.
+| Document | What's in it |
+| --- | --- |
+| [`docs/API.md`](docs/API.md) | Every API route: auth, request/response shapes, status codes |
+| [`docs/DATABASE.md`](docs/DATABASE.md) | Schema, build/share semantics, seed data, test database |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Local setup, object storage, testing, CI |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Target cloud architecture, CI, environment variables |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Short architecture orientation |
+| [`project-management/ARCHITECTURE.md`](project-management/ARCHITECTURE.md) | Full architecture and rationale |
+| [`project-management/DECISIONS.md`](project-management/DECISIONS.md) | Architecture decision records |
+| [`project-management/DEVELOPMENT_ROADMAP.md`](project-management/DEVELOPMENT_ROADMAP.md) | Phases and milestones |
+
+Each package has its own README describing its modules.
+
+## Known limitations
+
+- **Not deployed.** The Vercel + Neon + R2 setup is a design; nothing is hosted yet.
+- **No slot limits.** You can add several CPUs or GPUs; the compatibility rules tolerate
+  it but nothing enforces "one CPU per build". Thermal/performance estimates use the
+  first CPU/GPU listed.
+- **Approximate layouts.** Zone positions are a schematic floor plan, not real case
+  geometry (for example the PSU bay can sit partly outside the case wireframe). Models
+  are generic procedural shapes unless a `.glb` is uploaded per component.
+- **Estimates are heuristics**, not simulations or benchmarks; performance is a relative
+  score, not FPS. Only case fans count toward noise/airflow (no GPU/CPU cooler fans, no
+  AIO radiator fans).
+- **Orphaned uploads:** deleting a component doesn't delete its files from object storage.
+- **Upload hardening is minimal.** Uploads are admin-only and checked against a
+  content-type allowlist; the size limits are advisory (presigned PUTs can't enforce
+  them) and there is no magic-byte sniffing. There is no rate limiting on sign-in,
+  registration or uploads. Fine for a trusted-admin MVP, worth adding before public launch.
+- **Cosmetic:** a Turbopack `export *` warning about `@prisma/client` appears in builds.
+
+## Continuing development
+
+The project keeps a session-continuity system in `project-management/`. To resume, read
+`SESSION_CHECKPOINT.md` first (exact state and next steps), then `PROJECT_STATUS.md` and
+`TODO.md`.

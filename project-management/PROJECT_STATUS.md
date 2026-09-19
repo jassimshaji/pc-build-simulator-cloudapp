@@ -1,8 +1,8 @@
 # Project Status
 
-**Current phase:** Phase 4 COMPLETE (all 6 milestones) — next up is Phase 5
-(Build Management: save/load/share, build summary panel)
-**Overall completion:** ~80%
+**Current phase:** ALL PHASES (0-6) COMPLETE. Remaining work is optional polish and
+post-MVP ideas (see Remaining below).
+**Overall completion:** 100% of the roadmap; CI passing on `main`.
 
 ## Completed
 - Phase 0: full architecture, database design, compatibility engine design, 3D engine
@@ -279,30 +279,51 @@ generators for the original 6 categories, installation zones, click-to-place
 + compatibility re-check, the remaining 6 procedural generators, and real
 GLTF asset resolution/loading).
 
-## In progress
-- Nothing — at a checkpoint awaiting user instruction to start Phase 5.
+- **Phase 5 — Build Management (all 3 milestones), completed 2026-09-19:**
+  1. Builds: `/api/builds` (create / list / get / rename / replace components / delete /
+     duplicate), the `/builds` page, owner-scoped (others get 404). One
+     `BuildComponent` row per unit with an `UNPLACED` sentinel; pure
+     `serializeBuild`/`deserializeBuild`; server-computed compatibility + power snapshot
+     (ADR-010). Camera stored in `workspaceState` (validated) and restored, also in the
+     shared view.
+  2. Sharing: `POST /api/builds/:id/share` mints a 72-bit slug and clears it on disable;
+     public read-only `/shared/[slug]` (ADR-011).
+  3. Build summary panel (count, price, power, issues, missing essentials).
+- **Phase 6 — Simulation Features (all 3 items), completed 2026-09-19:** fan mounts on
+  front/rear/top with airflow direction and case pressure (ADR-012), animated airflow
+  particles, and rule-based thermal / noise / performance estimates labelled as rough
+  (ADR-013).
+- **Workspace UX (2026-09-19):** "Add to build" auto-places into the first free zone; the
+  camera is framed on the case; the layout is pinned to the viewport; hydration warning
+  from browser extensions suppressed.
+- **Seed data:** 20 components covering all 12 categories.
+- **Cross-cutting (2026-09-19):** 64 API integration tests (real Postgres test database),
+  13 Playwright flows, 243 package unit tests (307 Vitest tests + 13 browser = 320 in
+  total); docs brought up to date; GitHub Actions CI passing on `main` (ADR-014). The API
+  tests found and fixed a real 500 (deleting a component used by a saved build).
+- **Local environment:** SeaweedFS uploads work again (root cause: `weed.exe` ignored
+  flags after a path with a space; port 8080 was taken) — documented.
 
-## Remaining (see DEVELOPMENT_ROADMAP.md for full detail)
-- Phase 5: build save/load/share/summary.
-- Phase 6: fan/airflow visualization.
+## In progress
+- Nothing. All roadmap phases are complete and pushed.
+
+## Remaining (optional — none is in the roadmap)
+- Deploy: Vercel + Neon + R2 are a design only (`docs/DEPLOYMENT.md` lists the steps).
+- Slot limits (one CPU, etc.) are not enforced.
+- Real case geometry for zone positions (today a schematic floor plan; e.g. the PSU bay can
+  sit partly outside the case wireframe), and real 3D models via the asset manager.
+- Hardening before a public launch: rate limiting on auth/uploads, magic-byte checks and
+  enforced upload sizes (see ARCHITECTURE.md §11), deleting a component's storage objects.
+- Better estimates (a real thermal model) and a pointer-drag placement mode (ADR-003).
 
 ## Known issues
-- None blocking. Orphaned storage objects on component delete and a cosmetic
-  Turbopack `export *` build warning are still open but non-blocking
-  (unchanged from prior sessions). New this session: the local SeaweedFS dev
-  server isn't loading its `s3-config.json` identities (presigned S3 uploads
-  get a 403 `InvalidAccessKeyId` even with the documented path-quoting fix
-  applied) — this blocks *local* image/model upload testing via the real
-  presigned-upload flow until investigated further; it does not affect
-  production (Cloudflare R2) config, and the Milestone 6 GLTF-rendering path
-  itself was still fully verified using a real `.glb` served a different way.
+- None blocking. Non-blocking: orphaned storage objects on component delete; a cosmetic
+  Turbopack `export *` warning about `@prisma/client` in builds; the 3D zone click targets
+  are small at high zoom-out; estimates use only the first CPU/GPU in a build.
 
 ## Blockers
-- None for development. See the new known issue above if a future session
-  specifically needs to test the local presigned-upload flow.
+- None.
 
 ## Next recommended action
-Say "Continue" to begin **Phase 5, Milestone 1: build save/load/rename/
-duplicate/delete**, persisting a build's `workspaceState` (camera) and
-`BuildComponent` placements. See `SESSION_CHECKPOINT.md` for exact resume
-details.
+Pick from "Remaining" — most valuable first: a first deployment, then pre-launch
+hardening. See `SESSION_CHECKPOINT.md` for the exact current state.

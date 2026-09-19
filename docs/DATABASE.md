@@ -7,7 +7,7 @@ full design rationale (hybrid relational/JSONB approach) is in
 
 ## Local setup
 
-Requires a local PostgreSQL server (17 recommended). Either run one via Docker
+Requires a local PostgreSQL server (17+ recommended). Either run one via Docker
 (`docker compose -f docker/docker-compose.yml up -d`, see `docker/README.md`) or use
 a natively installed Postgres. Create a role/database matching `DATABASE_URL`:
 

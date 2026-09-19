@@ -2,6 +2,81 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-19 — Documentation refresh
+- README rewritten for the finished product (features, accurate stack, quick start,
+  test/CI overview, documentation index, honest known limitations). Per-package READMEs
+  (`three-d-engine`, `compatibility-engine`, `database`), `apps/web/README.md`,
+  `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/DEVELOPMENT.md` and
+  `infrastructure/README.md` brought up to date; stale "stub"/"pending"/"Phase N,
+  Milestone M" wording removed; the SeaweedFS troubleshooting notes merged (the older
+  quoting advice did not actually work).
+- `ARCHITECTURE.md` gained §11 "As-built notes" and `DECISIONS.md` ADR-010 to ADR-014.
+  Recorded that several §9 security items (magic-byte sniffing, enforced upload size,
+  rate limiting) are **not** implemented.
+- Roadmap and status tracking brought up to date through Phase 6.
+
+## 2026-09-19 — CI running on GitHub; first-run fix
+- Pushed to `origin/main` (`jassimshaji/pc-build-simulator-cloudapp`). The first
+  GitHub Actions run failed at typecheck: on a fresh checkout `apps/web` has no
+  generated route types, so `LayoutProps` was undefined. The web `typecheck` script now
+  runs `next typegen` first. The fix was reproduced and verified from a fresh clone
+  running every CI step; the second run passed end to end (typecheck, lint, all tests,
+  Playwright).
+
+## 2026-09-19 — Cross-cutting: tests, docs, CI
+- **API integration tests** (`apps/web/tests`, Vitest, 64 tests) against a separate
+  `pcbuilder_test` database: every route, the 401/403/400/404/409 matrix, catalog
+  filters/pagination, admin CRUD, uploads, CSV round trip, compatibility scenarios and the
+  full build lifecycle including ownership isolation and sharing. Only `requireRole` is
+  replaced; the real one is tested separately (ADR-014).
+- **Bug found and fixed by those tests:** deleting a component used by a saved build
+  crashed with an unmapped Prisma error (500) instead of returning 409; the route now
+  checks usage up front.
+- **Browser tests** (`apps/web/e2e`, Playwright, 13 flows): register/login/logout, role
+  gating, adding parts, a live compatibility ERROR, guest save prompt, airflow/estimates,
+  save/list/reopen/rename/duplicate/delete, cross-user isolation, share + revoke.
+- `docs/API.md` (builds, share, duplicate, shared view, conventions), `docs/DATABASE.md`
+  (build/share semantics, `UNPLACED`, camera, 20-component seed, test DB) and
+  `docs/DEVELOPMENT.md` (testing layers, setup) expanded; a stale planned-routes table
+  removed.
+- `.github/workflows/ci.yml` added; `turbo.json` passes `TEST_DATABASE_URL` through.
+
+## 2026-09-19 — Phase 6: simulation features
+- **Fan orientation + case pressure.** `airflow.ts`: fan mounts on the front, rear and top
+  (`fanMountFace`, ADR-012); a normal blade intakes at the front and exhausts at the
+  rear/top, a reverse blade flips it; net CFM gives positive / negative / balanced
+  pressure. Airflow panel in the workspace and shared view.
+- **Airflow visualization.** `AirflowStream` renders animated particles through each
+  placed fan along its mount axis (orange exhaust, blue intake); "Show airflow" toggle.
+- **Estimates** (`estimates.ts`, ADR-013): case-fan noise (log-summed dBA), CPU/GPU load
+  temperature from cooler capacity and airflow, and a relative performance score with
+  bottleneck detection; an Estimates panel labelled as rough.
+
+## 2026-09-19 — Phase 5: build management, sharing, summary
+- **Builds** (`/api/builds`, `/builds`): create / list / get / rename / replace
+  components / delete / duplicate, owner-scoped (others get 404). One row per unit with an
+  `UNPLACED` sentinel; server-computed compatibility + power snapshot (ADR-010).
+- **Sharing:** `POST /api/builds/:id/share` (72-bit slug, cleared on disable) and the
+  public read-only `/shared/[slug]` (ADR-011).
+- **Build summary panel:** count, total price, power, issue counts, missing essentials.
+- **Camera** saved in `workspaceState` (validated; junk ignored) and restored on load and
+  in the shared view. Also fixed "Reset view" aiming at the origin instead of the case.
+
+## 2026-09-19 — Workspace UX fixes
+- "Add to build" now places a part into the first free compatible zone
+  (`findFreeZone`); previously it only listed the part and nothing appeared in 3D.
+- Default camera moved from ~10 m away to ~1 m from the case (the case looked like a
+  speck); workspace pinned to the viewport so panels scroll internally and the footer
+  stays visible; `suppressHydrationWarning` on `<html>`/`<body>` for browser-extension
+  attribute injection.
+
+## 2026-09-19 — Seed data and local environment
+- Seed extended from 7 to **20 components covering all 12 categories** (plus brands MSI,
+  Noctua, LG), including deliberately awkward parts for compatibility testing.
+- The local SeaweedFS S3 gateway now works: the earlier 403 / "Available keys: 0" issue
+  was `weed.exe` ignoring flags after a path containing a space, plus port 8080 being
+  taken. Documented in `docs/DEVELOPMENT.md`.
+
 ## 2026-09-13 — Phase 4, Milestone 6: real GLTF asset loading (Phase 4 complete)
 - New `resolveComponentAsset(categoryKey, specifications, asset?)` in
   `packages/three-d-engine`: implements ARCHITECTURE.md §7.3's resolution
