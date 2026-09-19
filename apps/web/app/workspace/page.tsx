@@ -2,7 +2,8 @@ import { getServerSession } from "next-auth";
 import { prisma } from "@pcbuilder/database";
 import { authOptions } from "@/lib/auth";
 import { toInitialBuild, workspaceBuildInclude } from "@/lib/builds";
-import { BuildWorkspace, type InitialBuild } from "./build-workspace";
+import type { InitialBuild } from "@/types/workspace";
+import { BuildWorkspace } from "./build-workspace";
 
 // Server component: fetches categories once (and, for `?build=<id>`, the
 // signed-in user's saved build), then hands off to the client component for

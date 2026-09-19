@@ -1,102 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-import Link from "next/link";
-import type { CompatibilityReport } from "@pcbuilder/compatibility-engine";
-import { serializeBuild } from "@pcbuilder/three-d-engine/src/buildSerialization";
-import { AirflowPanel } from "@/components/airflow-panel";
-import { BuildSummary } from "@/components/build-summary";
-import { EstimatesPanel } from "@/components/estimates-panel";
-import type { CameraState, PlacedComponent, WorkspaceCanvasHandle } from "@pcbuilder/three-d-engine";
+import { useCallback, useRef, useState } from "react";
+import type { WorkspaceCanvasHandle } from "@pcbuilder/three-d-engine";
+import { SceneCanvas } from "@/components/scene-canvas";
+import { BuildSidebar } from "@/components/workspace/BuildSidebar";
+import { ComponentPicker } from "@/components/workspace/ComponentPicker";
+import { SaveBar } from "@/components/workspace/SaveBar";
+import { StatusFooter } from "@/components/workspace/StatusFooter";
+import { ViewportControls } from "@/components/workspace/ViewportControls";
+import { useBuildDraft } from "@/hooks/useBuildDraft";
+import { useBuildPersistence } from "@/hooks/useBuildPersistence";
+import { useCompatibilityReport } from "@/hooks/useCompatibilityReport";
+import { useComponentCatalog } from "@/hooks/useComponentCatalog";
+import type { Category, ComponentSummary, InitialBuild } from "@/types/workspace";
 
-// WebGL needs a browser — @react-three/fiber's Canvas can't render on the
-// server, so it's loaded client-only rather than through the normal static
-// import every other component here uses.
-const WorkspaceCanvas = dynamic(
-  () => import("@pcbuilder/three-d-engine").then((mod) => mod.WorkspaceCanvas),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-full w-full items-center justify-center text-sm text-zinc-600">
-        Loading 3D scene...
-      </div>
-    ),
-  },
-);
-
-interface Category {
-  id: string;
-  key: string;
-  label: string;
-}
-
-interface ThreeDAssetSummary {
-  kind: "GLTF_MODEL" | "PROCEDURAL_FALLBACK" | "PLACEHOLDER";
-  url: string | null;
-}
-
-interface ComponentSummary {
-  id: string;
-  model: string;
-  price: string;
-  specifications: Record<string, unknown>;
-  category: { key: string; label: string };
-  brand: { name: string };
-  threeDAssets: ThreeDAssetSummary[];
-}
-
-export interface BuildLine {
-  componentId: string;
-  categoryKey: string;
-  categoryLabel: string;
-  model: string;
-  quantity: number;
-  price: number; // unit price
-  specifications: Record<string, unknown>;
-  // The schema allows several ThreeDAsset rows per component, but the admin
-  // 3D asset manager only ever manages one "slot" (see its own route
-  // comment) — the first row is that slot. No row at all just means nobody
-  // has assigned one yet, which resolveComponentAsset already treats as
-  // "use the procedural fallback".
-  asset?: ThreeDAssetSummary;
-}
-
-// Renders a `specifications` value for display. Arrays join with commas;
-// nested objects (e.g. a motherboard's `dimensionsMm: { width, depth }`)
-// render as "key: value" pairs rather than the useless "[object Object]"
-// that `String()` would otherwise produce.
-function formatSpecValue(value: unknown): string {
-  if (Array.isArray(value)) {
-    return value.join(", ");
-  }
-  if (value && typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>)
-      .map(([key, nested]) => `${key}: ${nested}`)
-      .join(", ");
-  }
-  return String(value);
-}
-
-// Component picker with a live compatibility/power check (Phase 3) plus
-// real 3D click-to-place (Phase 4, Milestone 4): a case in the build renders
-// immediately, and selecting a component highlights the 3D zones that accept
-// its category — clicking one snaps it into place (both adding it to the
-// build and, once a motherboard is placed, composing the motherboard's own
-// zones into the case so RAM/GPU/etc. can be placed into *it* in turn).
-// Deliberately doesn't enforce "one CPU per build" or similar slot
-// uniqueness yet: "Add to build" (the button, not a zone click) still lets
-// you add without placing, and the compatibility rules already tolerate
-// multiples — real slot *enforcement* is left for later polish.
-export interface InitialBuild {
-  id: string;
-  name: string;
-  buildLines: BuildLine[];
-  placements: Record<string, PlacedComponent>;
-  shareSlug?: string | null;
-  camera?: CameraState | null;
-}
-
+// The interactive workspace: pick components, see them in 3D, get live
+// compatibility/power feedback, and save/share the build. This component only
+// composes — the state lives in hooks (catalog, draft build, compatibility
+// report, persistence) and every panel is its own component under
+// components/workspace/.
+//
+// Placement: "Add to build" drops a part into the first free compatible zone
+// (needs a case, and a motherboard for RAM/GPU/etc.); alternatively select a
+// part and click a highlighted zone in the 3D view to choose the slot. Slot
+// uniqueness (one CPU, ...) is deliberately not enforced.
 export function BuildWorkspace({
   categories,
   initialBuild,
@@ -104,215 +31,38 @@ export function BuildWorkspace({
   categories: Category[];
   initialBuild?: InitialBuild;
 }) {
-  const [buildId, setBuildId] = useState<string | null>(initialBuild?.id ?? null);
-  const [buildName, setBuildName] = useState(initialBuild?.name ?? "My build");
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showAirflow, setShowAirflow] = useState(true);
-  const [shareSlug, setShareSlug] = useState<string | null>(initialBuild?.shareSlug ?? null);
-  const [activeCategoryKey, setActiveCategoryKey] = useState<string | null>(
-    categories[0]?.key ?? null,
-  );
-  const [search, setSearch] = useState("");
-  const [components, setComponents] = useState<ComponentSummary[]>([]);
-  const [selected, setSelected] = useState<ComponentSummary | null>(null);
-  const [buildLines, setBuildLines] = useState<BuildLine[]>(initialBuild?.buildLines ?? []);
-  const [placements, setPlacements] = useState<Record<string, PlacedComponent>>(
-    initialBuild?.placements ?? {},
-  );
-  const [report, setReport] = useState<CompatibilityReport | null>(null);
   const canvasRef = useRef<WorkspaceCanvasHandle>(null);
+  const [selected, setSelected] = useState<ComponentSummary | null>(null);
+  const [showAirflow, setShowAirflow] = useState(true);
 
-  // Derived, not stored: true whenever the build has components but the check
-  // for the current selection hasn't resolved yet (handleAdd/handleRemove
-  // clear `report` back to null on every selection change below).
-  const isCheckingCompatibility = buildLines.length > 0 && report === null;
+  const catalog = useComponentCatalog(categories);
+  const draft = useBuildDraft(initialBuild);
+  const { report, isChecking } = useCompatibilityReport(draft.buildLines);
+  const persistence = useBuildPersistence({
+    initialBuild,
+    buildLines: draft.buildLines,
+    placements: draft.placements,
+    getCamera: useCallback(() => canvasRef.current?.getCameraState(), []),
+  });
 
   // The case renders in 3D as soon as it's added — it's the root container,
-  // not something placed *into* a zone, so there's nothing to click-place it
-  // into. (Takes the first CASE line if more than one somehow ended up in
-  // the build; slot uniqueness isn't enforced.)
-  const caseLine = buildLines.find((line) => line.categoryKey === "CASE");
+  // not something placed *into* a zone. (Takes the first CASE line if more
+  // than one somehow ended up in the build.)
+  const caseLine = draft.buildLines.find((line) => line.categoryKey === "CASE");
 
-  useEffect(() => {
-    if (!activeCategoryKey) {
-      return;
-    }
-
-    const controller = new AbortController();
-    const params = new URLSearchParams({ category: activeCategoryKey, limit: "50" });
-    if (search) params.set("q", search);
-
-    fetch(`/api/components?${params}`, { signal: controller.signal })
-      .then((response) => response.json())
-      .then((body) => setComponents(body?.data?.items ?? []))
-      .catch((error) => {
-        if (error.name !== "AbortError") setComponents([]);
-      });
-
-    return () => controller.abort();
-  }, [activeCategoryKey, search]);
-
-  useEffect(() => {
-    if (buildLines.length === 0) {
-      return;
-    }
-
-    const controller = new AbortController();
-    fetch("/api/compatibility/check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        selections: buildLines.map((line) => ({
-          componentId: line.componentId,
-          quantity: line.quantity,
-        })),
-      }),
-    })
-      .then((response) => response.json())
-      .then((body) => setReport(body?.data ?? null))
-      .catch((error) => {
-        if (error.name !== "AbortError") setReport(null);
-      });
-
-    return () => controller.abort();
-  }, [buildLines]);
-
-  function handleAdd(component: ComponentSummary) {
-    const existing = buildLines.find((line) => line.componentId === component.id);
-    const next = existing
-      ? buildLines.map((line) =>
-          line.componentId === component.id ? { ...line, quantity: line.quantity + 1 } : line,
-        )
-      : [
-          ...buildLines,
-          {
-            componentId: component.id,
-            categoryKey: component.category.key,
-            categoryLabel: component.category.label,
-            model: component.model,
-            quantity: 1,
-            price: Number(component.price),
-            specifications: component.specifications,
-            asset: component.threeDAssets[0],
-          },
-        ];
-    setBuildLines(next);
-    setReport(null); // stale until the effect's check for the new selection resolves
-  }
-
-  function handleRemove(componentId: string) {
-    setBuildLines(buildLines.filter((line) => line.componentId !== componentId));
-    setPlacements((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([, placed]) => placed.componentId !== componentId)),
-    );
-    setReport(null);
-  }
-
-  // "Add to build" button: adds the component and, if there's a free
-  // compatible zone in the 3D scene (needs a case, and a motherboard for
-  // RAM/GPU/etc.), drops it straight into the first one so it actually shows
-  // up — otherwise it's only listed, with the hint text below the button.
+  // "Add to build": add the part and, if there's a free compatible zone, place it.
   function handleAddAndPlace(component: ComponentSummary) {
-    handleAdd(component);
-    if (component.category.key === "CASE") {
-      return;
-    }
-    const zoneKey = canvasRef.current?.findFreeZone(component.category.key);
-    if (zoneKey) {
-      setPlacements((prev) => ({
-        ...prev,
-        [zoneKey]: {
-          componentId: component.id,
-          categoryKey: component.category.key,
-          specifications: component.specifications,
-          asset: component.threeDAssets[0],
-        },
-      }));
-    }
+    const zoneKey =
+      component.category.key === "CASE" ? null : canvasRef.current?.findFreeZone(component.category.key);
+    draft.addComponent(component, zoneKey);
   }
 
-  // The click-to-place step of ARCHITECTURE.md §7.1: only does anything when
-  // the zone that was clicked actually accepts the category of whatever's
-  // currently selected in the picker (WorkspaceCanvas already only makes
-  // *matching, unoccupied* zones clickable, but this check is what actually
-  // decides whether a placement happens — the 3D package has no notion of
-  // "the selected component", only zone data).
+  // Click-to-place: only does anything when the clicked zone accepts the
+  // selected component's category (the 3D package has no notion of "the
+  // selected component", only zones).
   function handleZoneClick(zoneKey: string, acceptsCategory: string) {
-    if (!selected || selected.category.key !== acceptsCategory) {
-      return;
-    }
-    handleAdd(selected);
-    setPlacements((prev) => ({
-      ...prev,
-      [zoneKey]: {
-        componentId: selected.id,
-        categoryKey: selected.category.key,
-        specifications: selected.specifications,
-        asset: selected.threeDAssets[0],
-      },
-    }));
-  }
-
-  // Saves the full workspace state: creates the build on first save, then
-  // replaces its component set (and the current camera viewpoint) on every
-  // later one.
-  async function handleSave() {
-    setIsSaving(true);
-    setSaveStatus(null);
-    try {
-      const rows = serializeBuild(buildLines, placements);
-      const response = await fetch(buildId ? `/api/builds/${buildId}` : "/api/builds", {
-        method: buildId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: buildName,
-          rows,
-          workspaceState: { camera: canvasRef.current?.getCameraState() ?? undefined },
-        }),
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok) {
-        setSaveStatus(
-          response.status === 401
-            ? "Log in to save builds."
-            : (body?.error?.message ?? "Save failed."),
-        );
-        return;
-      }
-      setBuildId(body.data.id);
-      setSaveStatus("Saved.");
-    } catch {
-      setSaveStatus("Save failed.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleShareToggle(enabled: boolean) {
-    if (!buildId) return;
-    setSaveStatus(null);
-    const response = await fetch(`/api/builds/${buildId}/share`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled }),
-    }).catch(() => null);
-    const body = await response?.json().catch(() => null);
-    if (!response?.ok) {
-      setSaveStatus(body?.error?.message ?? "Could not update sharing.");
-      return;
-    }
-    setShareSlug(body.data.shareSlug);
-  }
-
-  async function handleCopyLink() {
-    if (!shareSlug) return;
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/shared/${shareSlug}`);
-      setSaveStatus("Link copied.");
-    } catch {
-      setSaveStatus(`${window.location.origin}/shared/${shareSlug}`);
+    if (selected && selected.category.key === acceptsCategory) {
+      draft.addComponent(selected, zoneKey);
     }
   }
 
@@ -320,111 +70,33 @@ export function BuildWorkspace({
     // Pinned to the viewport below the 3.5rem nav so the panels scroll
     // internally instead of the whole page growing past the footer.
     <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-800 bg-zinc-900/40 px-4 py-2 text-xs">
-        <input
-          type="text"
-          value={buildName}
-          maxLength={100}
-          onChange={(event) => setBuildName(event.target.value)}
-          aria-label="Build name"
-          className="w-56 rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-100"
-        />
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isSaving || !buildName.trim()}
-          className="rounded bg-zinc-100 px-3 py-1 font-medium text-zinc-950 disabled:opacity-50"
-        >
-          {isSaving ? "Saving..." : buildId ? "Save" : "Save build"}
-        </button>
-        {buildId &&
-          (shareSlug ? (
-            <>
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="rounded border border-zinc-800 px-2 py-1 hover:bg-zinc-900"
-              >
-                Copy share link
-              </button>
-              <button
-                type="button"
-                onClick={() => handleShareToggle(false)}
-                className="text-zinc-400 hover:text-red-400"
-              >
-                Stop sharing
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => handleShareToggle(true)}
-              className="rounded border border-zinc-800 px-2 py-1 hover:bg-zinc-900"
-            >
-              Share
-            </button>
-          ))}
-        <Link href="/builds" className="text-zinc-400 hover:text-zinc-100">
-          My builds
-        </Link>
-        {saveStatus && <span className="text-zinc-500">{saveStatus}</span>}
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-        {/* Component inventory panel */}
-        <aside className="flex shrink-0 flex-col border-b border-zinc-800 bg-zinc-900/40 lg:w-64 lg:border-b-0 lg:border-r lg:overflow-y-auto">
-          <div className="p-3">
-            <input
-              type="search"
-              placeholder="Search components..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="w-full rounded border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
-            />
-          </div>
-          <nav className="flex gap-2 overflow-x-auto px-3 pb-3 text-sm lg:flex-col lg:gap-1 lg:overflow-x-visible">
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                onClick={() => setActiveCategoryKey(category.key)}
-                className={`shrink-0 rounded px-3 py-1.5 text-left lg:w-full lg:shrink ${
-                  activeCategoryKey === category.key
-                    ? "bg-zinc-800 text-zinc-100"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                {category.label}
-              </button>
-            ))}
-          </nav>
-          <div className="flex flex-col gap-1 px-3 pb-3">
-            {components.length === 0 && (
-              <p className="text-xs text-zinc-600">No components found.</p>
-            )}
-            {components.map((component) => (
-              <button
-                key={component.id}
-                type="button"
-                onClick={() => setSelected(component)}
-                className={`rounded border px-2 py-1.5 text-left text-xs ${
-                  selected?.id === component.id
-                    ? "border-zinc-600 bg-zinc-800"
-                    : "border-transparent hover:bg-zinc-900"
-                }`}
-              >
-                <div className="text-zinc-200">{component.model}</div>
-                <div className="text-zinc-500">
-                  {component.brand.name} · ${Number(component.price).toFixed(2)}
-                </div>
-              </button>
-            ))}
-          </div>
-        </aside>
+      <SaveBar
+        buildName={persistence.buildName}
+        onBuildNameChange={persistence.setBuildName}
+        isSaved={persistence.buildId !== null}
+        isSaving={persistence.isSaving}
+        onSave={persistence.save}
+        shareSlug={persistence.shareSlug}
+        onSetSharing={persistence.setSharing}
+        onCopyShareLink={persistence.copyShareLink}
+        status={persistence.status}
+      />
 
-        {/* 3D workspace */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+        <ComponentPicker
+          categories={categories}
+          activeCategoryKey={catalog.activeCategoryKey}
+          onSelectCategory={catalog.setActiveCategoryKey}
+          search={catalog.search}
+          onSearchChange={catalog.setSearch}
+          components={catalog.components}
+          selectedId={selected?.id ?? null}
+          onSelectComponent={setSelected}
+        />
+
         <main className="flex min-h-[16rem] flex-1 flex-col gap-2 border-b border-zinc-800 p-3 lg:min-h-0 lg:border-b-0 lg:border-r">
           <div className="min-h-0 flex-1 overflow-hidden rounded border border-zinc-800">
-            <WorkspaceCanvas
+            <SceneCanvas
               ref={canvasRef}
               caseComponent={
                 caseLine
@@ -436,175 +108,33 @@ export function BuildWorkspace({
                     }
                   : null
               }
-              placements={placements}
+              placements={draft.placements}
               highlightCategory={selected?.category.key ?? null}
               onZoneClick={handleZoneClick}
               showAirflow={showAirflow}
               initialCamera={initialBuild?.camera}
             />
           </div>
-          <div className="flex items-center justify-between text-xs text-zinc-500">
-            <span>Drag to orbit · Scroll to zoom · Right-click drag to pan</span>
-            <label className="ml-auto mr-3 flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={showAirflow}
-                onChange={(event) => setShowAirflow(event.target.checked)}
-              />
-              Show airflow
-            </label>
-            <button
-              type="button"
-              onClick={() => canvasRef.current?.resetView()}
-              className="rounded border border-zinc-800 px-2 py-1 hover:bg-zinc-900"
-            >
-              Reset view
-            </button>
-          </div>
+          <ViewportControls
+            showAirflow={showAirflow}
+            onShowAirflowChange={setShowAirflow}
+            onResetView={() => canvasRef.current?.resetView()}
+          />
         </main>
 
-        {/* Component details / build / compatibility panel */}
-        <aside className="flex shrink-0 flex-col gap-4 bg-zinc-900/40 p-4 text-sm lg:w-80 lg:overflow-y-auto">
-          <div>
-            <h2 className="font-medium text-zinc-200">Component details</h2>
-            {selected ? (
-              <div className="mt-2 space-y-2">
-                <p className="text-zinc-300">
-                  {selected.model} <span className="text-zinc-600">({selected.brand.name})</span>
-                </p>
-                <p className="text-zinc-500">${Number(selected.price).toFixed(2)}</p>
-                <ul className="space-y-0.5 text-xs text-zinc-500">
-                  {Object.entries(selected.specifications).map(([key, value]) => (
-                    <li key={key}>
-                      <span className="text-zinc-600">{key}:</span> {formatSpecValue(value)}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => handleAddAndPlace(selected)}
-                  className="rounded bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950"
-                >
-                  Add to build
-                </button>
-                {selected.category.key === "CASE" ? (
-                  <p className="text-zinc-600">Adds it and shows it in the 3D view immediately.</p>
-                ) : caseLine ? (
-                  <p className="text-zinc-600">
-                    Placed in the first free slot automatically — or click a highlighted zone in
-                    the 3D view to choose one.
-                    {selected.category.key !== "MOTHERBOARD" &&
-                      " (RAM, GPU and storage slots appear once a motherboard is placed.)"}
-                  </p>
-                ) : (
-                  <p className="text-zinc-600">Add a case first to enable 3D placement.</p>
-                )}
-              </div>
-            ) : (
-              <p className="text-zinc-600">Select a component to see its specifications.</p>
-            )}
-          </div>
-
-          <div>
-            <h2 className="font-medium text-zinc-200">Your build</h2>
-            {buildLines.length === 0 ? (
-              <p className="text-zinc-600">No components added yet.</p>
-            ) : (
-              <ul className="mt-2 space-y-1 text-xs">
-                {buildLines.map((line) => {
-                  const isPlaced =
-                    line.categoryKey === "CASE" ||
-                    Object.values(placements).some((placed) => placed.componentId === line.componentId);
-                  return (
-                    <li key={line.componentId} className="flex items-center justify-between gap-2">
-                      <span className="text-zinc-300">
-                        {line.model}{" "}
-                        <span className="text-zinc-600">
-                          ({line.categoryLabel}
-                          {line.quantity > 1 ? ` ×${line.quantity}` : ""})
-                        </span>
-                        {isPlaced && <span className="ml-1 text-emerald-500">● placed</span>}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(line.componentId)}
-                        className="text-zinc-500 hover:text-red-400"
-                        aria-label={`Remove ${line.model}`}
-                      >
-                        ✕
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          <div>
-            <h2 className="font-medium text-zinc-200">Build summary</h2>
-            <BuildSummary lines={buildLines} report={report} />
-          </div>
-
-          <div>
-            <h2 className="font-medium text-zinc-200">Airflow</h2>
-            <AirflowPanel placements={placements} />
-          </div>
-
-          <div>
-            <h2 className="font-medium text-zinc-200">Estimates</h2>
-            <EstimatesPanel lines={buildLines} placements={placements} />
-          </div>
-
-          <div>
-            <h2 className="font-medium text-zinc-200">Compatibility</h2>
-            {buildLines.length === 0 && (
-              <p className="text-zinc-600">Add components to see compatibility checks.</p>
-            )}
-            {isCheckingCompatibility && <p className="text-zinc-600">Checking...</p>}
-            {report && (
-              <ul className="mt-2 space-y-1.5 text-xs">
-                {report.results.length === 0 ? (
-                  <li className="text-zinc-600">No issues detected yet.</li>
-                ) : (
-                  report.results.map((result, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <span
-                        className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                          result.severity === "ERROR"
-                            ? "bg-red-950 text-red-400"
-                            : result.severity === "WARNING"
-                              ? "bg-amber-950 text-amber-400"
-                              : "bg-emerald-950 text-emerald-400"
-                        }`}
-                      >
-                        {result.severity}
-                      </span>
-                      <span className="text-zinc-400">{result.message}</span>
-                    </li>
-                  ))
-                )}
-              </ul>
-            )}
-          </div>
-        </aside>
+        <BuildSidebar
+          selected={selected}
+          hasCase={caseLine !== undefined}
+          onAdd={handleAddAndPlace}
+          lines={draft.buildLines}
+          placements={draft.placements}
+          onRemove={draft.removeComponent}
+          report={report}
+          isChecking={isChecking}
+        />
       </div>
 
-      {/* Build summary bar */}
-      <footer className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-1 border-t border-zinc-800 bg-zinc-900/40 px-4 py-2 text-xs text-zinc-500">
-        <span>
-          Build summary:{" "}
-          {buildLines.length === 0
-            ? "no components yet"
-            : `${buildLines.reduce((sum, line) => sum + line.quantity, 0)} component(s), $${buildLines
-                .reduce((sum, line) => sum + line.price * line.quantity, 0)
-                .toFixed(2)}`}
-        </span>
-        <span>
-          Estimated power:{" "}
-          {report ? `${report.estimatedPowerWatts}W (recommend ${report.recommendedPsuWattage}W PSU)` : "—"}
-        </span>
-        <span>Compatibility: {report ? report.overallStatus : "—"}</span>
-      </footer>
+      <StatusFooter lines={draft.buildLines} report={report} />
     </div>
   );
 }

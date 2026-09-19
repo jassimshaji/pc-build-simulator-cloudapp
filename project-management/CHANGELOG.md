@@ -2,6 +2,27 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-19 — UI modularity and light/dark theme
+- **Theme:** a sun/moon toggle in the nav switches light and dark. Dark stays the default;
+  the choice is remembered and applied before first paint (inline `<head>` script). Light
+  mode overrides Tailwind's palette variables under `<html data-theme="light">`
+  (`app/theme.css`), so no component needed changes (ADR-015). The 3D scene follows via a
+  `theme` prop (`sceneTheme.ts`: backdrop, grid and airflow-particle colours; a contrast test
+  guards the particles). Input borders and dim text were tuned for legibility on a light page.
+- **Modularity (ADR-016):** the 610-line `build-workspace.tsx` is now a ~130-line composition
+  root. State/effects moved to hooks (`useComponentCatalog`, `useCompatibilityReport`,
+  `useBuildDraft`, `useBuildPersistence`, `useTheme`); build transitions became pure,
+  tested functions (`lib/buildDraft.ts`); each panel is its own component
+  (`components/workspace/*`); shared primitives added (`components/ui/*`); the themed canvas
+  (`scene-canvas.tsx`) and `CompatibilityResults` are reused by the public shared view, which
+  previously duplicated them. Shared UI types moved to `types/workspace.ts`.
+- `useCompatibilityReport` now ties each result to the request it answered, so a stale report
+  can never show for a changed build and "checking" is derived (removing bookkeeping from
+  every handler; a failed check no longer shows "Checking..." forever).
+- **Tests:** +12 web unit tests (`theme`, `buildDraft`), +1 scene-theme test file, +3
+  Playwright theme flows (toggle + persistence, carries to the 3D workspace, invalid stored
+  value). All 16 browser flows pass after the refactor.
+
 ## 2026-09-19 — Documentation refresh
 - README rewritten for the finished product (features, accurate stack, quick start,
   test/CI overview, documentation index, honest known limitations). Per-package READMEs

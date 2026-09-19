@@ -335,3 +335,50 @@ container and runs everything.
 **Consequences:** Tests exercise real SQL behavior and are reproducible locally and in CI.
 Cost: a Postgres database is required to run the web tests, and the seeded SKUs are part
 of the tests' contract.
+
+---
+
+## ADR-015: Light/dark theming by overriding Tailwind's palette variables, not by rewriting classes
+
+**Context:** The UI was written dark-only, with roughly 40 files using the zinc scale
+(`bg-zinc-950`, `text-zinc-100`, `border-zinc-800`, ...) plus a handful of status hues.
+A light theme could mean adding a `dark:` variant to every colour class (a large,
+error-prone rewrite that every future component must remember), or introducing semantic
+tokens everywhere.
+
+**Decision:** Tailwind v4 compiles every colour class to a CSS variable, so light mode is a
+second set of values for the same variables, applied under `<html data-theme="light">`
+(`app/theme.css`): the zinc scale is flipped end to end and the status hues are darkened.
+Components never check the theme. The attribute is set by an inline script in `<head>` before
+first paint (no flash) and read through `useSyncExternalStore` (`hooks/useTheme.ts`) — no
+provider. Dark stays the default (the app's original identity); the choice is stored in
+`localStorage`, and an invalid stored value falls back to dark. The 3D scene can't read CSS,
+so it gets the theme as a prop (`sceneTheme.ts`).
+
+**Consequences:** Zero churn in existing components and no per-component theme logic; new UI
+"just works" in both themes if it uses the normal palette. Cost: the light palette is a
+flipped/tuned mapping rather than hand-designed, and a genuinely new colour family needs
+its light values added to `theme.css`. If per-theme design divergence grows, introduce
+semantic tokens then.
+
+---
+
+## ADR-016: The workspace is composed of hooks and single-purpose panels
+
+**Context:** `build-workspace.tsx` had grown to ~600 lines mixing data fetching, build state,
+persistence, placement rules and every panel's markup, and the shared view duplicated the
+canvas loading and the compatibility list.
+
+**Decision:** State and side effects live in hooks (`useComponentCatalog`,
+`useCompatibilityReport`, `useBuildDraft`, `useBuildPersistence`); the build transitions are pure
+functions in `lib/buildDraft.ts` (unit-tested); each panel is its own component under
+`components/workspace/`; shared primitives are in `components/ui/`; the client-only themed
+canvas (`scene-canvas.tsx`) and the compatibility list are shared with the public view.
+`useCompatibilityReport` stores each result with the exact request it answered and only uses it
+while that still matches the current build, which removed the old "clear the report in every
+handler" bookkeeping and makes "checking" derived.
+
+**Consequences:** `build-workspace.tsx` is a thin composition root; panels can be changed,
+reused or tested independently, and a restyle of, say, all buttons is a one-file change. Cost:
+more files, and props are passed explicitly rather than through a context (deliberate — the
+data flow stays visible).

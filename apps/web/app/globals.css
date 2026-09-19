@@ -1,7 +1,9 @@
 @import "tailwindcss";
+@import "./theme.css";
 
-/* Committed dark "engineering tool" theme (not tied to OS light/dark
-   preference) — this is a workspace/tool UI, not a marketing site. */
+/* Dark is the default "engineering tool" look and is not tied to the OS
+   light/dark preference; visitors can switch with the nav toggle and the choice
+   is remembered (see theme.css and lib/theme.ts). */
 :root {
   --background: #09090b;
   --foreground: #e4e4e7;

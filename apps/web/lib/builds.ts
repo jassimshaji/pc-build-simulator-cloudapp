@@ -3,7 +3,7 @@ import { Prisma, prisma } from "@pcbuilder/database";
 import { deserializeBuild } from "@pcbuilder/three-d-engine/src/buildSerialization";
 import { cameraFromWorkspaceState } from "@pcbuilder/three-d-engine/src/cameraState";
 import { checkBuildCompatibility } from "@/lib/compatibility";
-import type { BuildLine, InitialBuild } from "@/app/workspace/build-workspace";
+import type { BuildLine, InitialBuild } from "@/types/workspace";
 
 export const buildRowSchema = z.object({
   componentId: z.string().min(1),

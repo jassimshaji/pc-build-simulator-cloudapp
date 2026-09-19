@@ -47,6 +47,44 @@ test.describe("register, login and logout", () => {
   });
 });
 
+test.describe("light / dark theme", () => {
+  const html = (page: import("@playwright/test").Page) => page.locator("html");
+
+  test("defaults to dark, toggles to light, and remembers the choice across reloads", async ({ page }) => {
+    await page.goto("/");
+    await expect(html(page)).toHaveAttribute("data-theme", "dark");
+
+    await page.getByRole("button", { name: "Switch to light mode" }).click();
+    await expect(html(page)).toHaveAttribute("data-theme", "light");
+    // The page background really changes colour, not just the attribute (the
+    // assertion retries because the colour fades over ~150ms).
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(250, 250, 250)");
+
+    // Reload: the saved theme is applied before first paint (no flash of dark).
+    await page.reload();
+    await expect(html(page)).toHaveAttribute("data-theme", "light");
+    await expect(page.getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Switch to dark mode" }).click();
+    await expect(html(page)).toHaveAttribute("data-theme", "dark");
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(9, 9, 11)");
+  });
+
+  test("the choice carries to other pages, including the 3D workspace", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Switch to light mode" }).click();
+    await page.goto("/workspace");
+    await expect(html(page)).toHaveAttribute("data-theme", "light");
+    await expect(page.locator("canvas")).toBeVisible(); // scene still renders in light mode
+  });
+
+  test("an invalid saved value falls back to dark", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("pcbuilder-theme", "purple"));
+    await page.goto("/");
+    await expect(html(page)).toHaveAttribute("data-theme", "dark");
+  });
+});
+
 test.describe("access control", () => {
   test("logged-out visitors are sent to log in for /admin and /builds", async ({ page }) => {
     await page.goto("/admin");

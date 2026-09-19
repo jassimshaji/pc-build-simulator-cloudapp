@@ -15,6 +15,8 @@ import { Grid, OrbitControls, useGLTF } from "@react-three/drei";
 import { Box3, type Group as ThreeGroup } from "three";
 import { AirflowStream } from "./AirflowStream";
 import type { CameraState } from "./cameraState";
+import { SceneThemeContext } from "./SceneThemeContext";
+import { getSceneTheme, type SceneThemeName } from "./sceneTheme";
 import { fanMountFaceForZone } from "./airflow";
 import { createGenericCase } from "./procedural";
 import { mm } from "./procedural/units";
@@ -75,6 +77,8 @@ export interface WorkspaceCanvasProps {
   // Restores a previously saved viewpoint on mount (see getCameraState). Only
   // read once; "Reset view" still returns to the default framing.
   initialCamera?: CameraState | null;
+  // Backdrop/grid colours (see sceneTheme.ts). Defaults to dark.
+  theme?: SceneThemeName;
 }
 
 // Runs inside the Canvas (it needs the r3f store): records the default
@@ -331,7 +335,7 @@ function ZoneMarkers({
 // ARCHITECTURE.md §7.1.
 export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
   function WorkspaceCanvas(
-    { caseComponent, placements = {}, highlightCategory, onZoneClick, showAirflow, initialCamera },
+    { caseComponent, placements = {}, highlightCategory, onZoneClick, showAirflow, initialCamera, theme },
     ref,
   ) {
     const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
@@ -402,6 +406,8 @@ export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvas
       return generateMotherboardZones(zoneSpec).map((zone) => composeZone(zone, worldOrigin));
     }, [caseScene, motherboardPlacement]);
 
+    const sceneTheme = getSceneTheme(theme);
+
     // First unoccupied zone (case zones, then the placed motherboard's own)
     // that accepts `category` — what "Add to build" uses to auto-place a part.
     useEffect(() => {
@@ -419,10 +425,16 @@ export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvas
       // about a meter away, aimed at its middle (see OrbitControls target below),
       // not the ~10m-away default that made cases render as a speck.
       <Canvas camera={{ position: [0.9, 0.6, 1.2], fov: 50, near: 0.05, far: 100 }}>
-        <color attach="background" args={["#09090b"]} />
+        <SceneThemeContext.Provider value={sceneTheme}>
+        <color attach="background" args={[sceneTheme.background]} />
         <ambientLight intensity={0.9} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
-        <Grid args={[20, 20]} cellColor="#27272a" sectionColor="#3f3f46" fadeDistance={25} />
+        <Grid
+          args={[20, 20]}
+          cellColor={sceneTheme.gridCell}
+          sectionColor={sceneTheme.gridSection}
+          fadeDistance={25}
+        />
 
         {caseScene && (
           <>
@@ -465,6 +477,7 @@ export const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvas
           minDistance={0.3}
           maxDistance={6}
         />
+        </SceneThemeContext.Provider>
       </Canvas>
     );
   },

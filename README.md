@@ -38,6 +38,9 @@ Live status: [`project-management/PROJECT_STATUS.md`](project-management/PROJECT
   viewpoint), rename, duplicate, delete.
 - **Share**: turn on sharing to get an unguessable link (`/shared/<slug>`) anyone can
   open in a read-only view — no account needed. Turning sharing off kills the link.
+- **Light and dark themes**: a sun/moon toggle in the nav switches the whole UI, including
+  the 3D scene's backdrop, grid and airflow colours. Dark is the default; the choice is
+  remembered and applied before first paint (no flash).
 
 **For admins** (`ADMIN` / `INVENTORY_MANAGER`, at `/admin`)
 - Inventory dashboard: stat tiles, search, low/out-of-stock views, inline stock editor.
@@ -70,6 +73,8 @@ Why each choice was made: [`project-management/ARCHITECTURE.md`](project-managem
 ```
 apps/web/                    Next.js app: pages, API routes, lib/, components/
   app/                       routes (workspace, builds, shared/[slug], admin/*, api/*)
+  components/                shared UI: ui/ primitives, workspace/ panels, side panels, nav, theme toggle
+  hooks/                     useTheme, useBuildDraft, useBuildPersistence, useCompatibilityReport, ...
   tests/                     API integration tests (Vitest, real Postgres test DB)
   e2e/                       critical-flow browser tests (Playwright)
   test-support/              test-database preparation shared by both
@@ -134,9 +139,9 @@ pnpm --filter web test:e2e   # Playwright browser tests
 
 | Layer | Where | Count |
 | --- | --- | --- |
-| Unit | `packages/component-models`, `compatibility-engine`, `three-d-engine` | 243 |
-| API integration (Vitest, real Postgres) | `apps/web/tests` | 64 |
-| Browser (Playwright) | `apps/web/e2e` | 13 |
+| Unit | `packages/component-models`, `compatibility-engine`, `three-d-engine` | 248 |
+| Web unit + API integration (Vitest, real Postgres) | `apps/web/tests` | 76 |
+| Browser (Playwright) | `apps/web/e2e` | 16 |
 
 The web tests use their own `pcbuilder_test` database (create it once —
 `CREATE DATABASE pcbuilder_test OWNER pcbuilder;`); migrations and seed are applied

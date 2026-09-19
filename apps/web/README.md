@@ -35,10 +35,13 @@ server component/route with `lib/requireRole.ts`.
 
 | Path | Contents |
 | --- | --- |
-| `app/` | Routes. Client components sit beside their page (`build-workspace.tsx`, `build-row-actions.tsx`, ...) |
-| `components/` | Shared UI: `nav.tsx`, and the workspace side panels — `build-summary.tsx`, `airflow-panel.tsx`, `estimates-panel.tsx` (used by both the editable workspace and the public shared view) |
-| `lib/` | `auth.ts` (next-auth config), `requireRole.ts`, `compatibility.ts` (Prisma rows → engine input), `builds.ts` (saved build ⇄ workspace state, camera sanitizing, ownership lookup), `inventory.ts`, `csv.ts`, `storage.ts` (presigned uploads), `threeDAssets.ts`, `zod-form.ts` |
-| `types/` | next-auth type augmentation |
+| `app/` | Routes. `workspace/build-workspace.tsx` is a thin composition root; `theme.css` holds the light palette |
+| `components/ui/` | Primitives: `Button` (variants), `TextInput`, `Section` / `Hint`, `SeverityBadge` |
+| `components/workspace/` | One component per workspace panel: `SaveBar`, `ComponentPicker`, `ComponentDetails`, `BuildList`, `CompatibilityPanel`, `BuildSidebar`, `ViewportControls`, `StatusFooter` |
+| `components/` (top level) | Reused across the workspace and the public shared view: `scene-canvas.tsx` (client-only 3D scene, themed), `compatibility-results.tsx`, `build-summary.tsx`, `airflow-panel.tsx`, `estimates-panel.tsx`; plus `nav.tsx` and `theme-toggle.tsx` |
+| `hooks/` | `useTheme`, `useComponentCatalog`, `useCompatibilityReport`, `useBuildDraft`, `useBuildPersistence` — all state and data fetching live here, not in components |
+| `lib/` | `auth.ts` (next-auth config), `requireRole.ts`, `compatibility.ts` (Prisma rows → engine input), `builds.ts` (saved build ⇄ workspace state, camera sanitizing, ownership lookup), `buildDraft.ts` (pure in-progress-build operations), `theme.ts`, `inventory.ts`, `csv.ts`, `storage.ts` (presigned uploads), `threeDAssets.ts`, `zod-form.ts` |
+| `types/` | `workspace.ts` (shared UI types) and the next-auth type augmentation |
 | `tests/` | API integration tests (Vitest) |
 | `e2e/` | Browser tests (Playwright) |
 | `test-support/` | Prepares the test database (migrate + seed) for both |
@@ -46,8 +49,8 @@ server component/route with `lib/requireRole.ts`.
 ## Tests
 
 ```bash
-pnpm --filter web test        # 64 API integration tests against a real Postgres test DB
-pnpm --filter web test:e2e    # 13 Playwright flows against a production build on :3100
+pnpm --filter web test        # 76 Vitest tests: API integration (real Postgres test DB) + pure UI logic
+pnpm --filter web test:e2e    # 16 Playwright flows (incl. the theme toggle) against a production build on :3100
 ```
 
 The API tests call the exported route handlers directly and replace only
@@ -57,3 +60,25 @@ has its own test. Setup, the `pcbuilder_test` database and CI are in
 
 `pnpm typecheck` runs `next typegen` first — the route types (`LayoutProps`, etc.) are
 generated, and don't exist on a fresh checkout.
+
+## Theming
+
+Dark is the default; the nav toggle switches to light and the choice is saved in
+`localStorage` (`pcbuilder-theme`). The mechanism has three small parts:
+
+1. An inline script in the root layout's `<head>` (`themeInitScript` in `lib/theme.ts`)
+   sets `<html data-theme="...">` before first paint, so there's no flash. It is
+   try/catch-wrapped, and anything unrecognised falls back to dark.
+2. `hooks/useTheme.ts` is a tiny external store over that attribute
+   (`useSyncExternalStore`) — any component can call `useTheme()`, and there is no
+   provider. It also syncs across tabs.
+3. `app/theme.css` holds the light palette. The UI is written against Tailwind's zinc
+   scale, and Tailwind v4 compiles every colour class to a CSS variable, so light mode
+   is a second set of values for those variables under `[data-theme="light"]` (the zinc
+   scale flipped, status hues darkened). **Components never check the theme** — new UI
+   just uses the normal zinc/red/emerald/amber classes and works in both. The 3D scene,
+   which can't read CSS, receives the theme as a prop (`SceneCanvas` →
+   `WorkspaceCanvas theme=`; colours in `packages/three-d-engine/src/sceneTheme.ts`).
+
+If you introduce a new colour family for status/decoration, add its light values to
+`theme.css` (the dark ones are Tailwind's defaults).

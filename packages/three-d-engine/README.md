@@ -5,7 +5,7 @@ React Three Fiber canvas, procedural model generators, the installation-zone sys
 click-to-place, GLTF asset loading — and (Phases 5-6) build serialization, the build
 summary, fan airflow, thermal/noise/performance estimates and camera state.
 
-**Status:** complete through Phase 6. 135 Vitest tests (`pnpm --filter
+**Status:** complete through Phase 6. 140 Vitest tests (`pnpm --filter
 @pcbuilder/three-d-engine test`).
 
 Only the files marked *(R3F)* need a browser/WebGL. Everything else is a pure function
@@ -19,7 +19,8 @@ components without pulling the 3D bundle into the main chunk.
 - `src/WorkspaceCanvas.tsx` *(R3F)* — the `<Canvas>` (lighting, grid, `OrbitControls`).
   Props: `caseComponent` (rendered immediately — it's the root container),
   `placements: Record<zoneKey, PlacedComponent>`, `highlightCategory`,
-  `onZoneClick(zoneKey, acceptsCategory)`, `showAirflow`, `initialCamera`. The imperative
+  `onZoneClick(zoneKey, acceptsCategory)`, `showAirflow`, `initialCamera`, `theme`
+  (`"light"` | `"dark"`, see `sceneTheme.ts`). The imperative
   handle (`ref`) exposes `resetView()`, `findFreeZone(category)` (first unoccupied
   compatible zone — what "Add to build" uses to auto-place) and `getCameraState()`.
   Every placed component goes through `resolveComponentAsset` (below). Loaded by
@@ -37,6 +38,13 @@ components without pulling the 3D bundle into the main chunk.
   placement); `PLACEHOLDER` shows a plain marker; `PROCEDURAL_FALLBACK` or *no
   `ThreeDAsset` row at all* uses the procedural generator. The case falls back to its
   procedural wireframe in every case, since the zone system is positioned against it.
+
+- `src/sceneTheme.ts` + `src/SceneThemeContext.ts` — the colours that must follow the
+  app's light/dark theme: backdrop, grid and airflow-particle colours (a darker shade on a
+  light backdrop so they stay visible; a test checks contrast). `WorkspaceCanvas`
+  provides the theme to its children through the context, because React context doesn't
+  cross the R3F `<Canvas>` boundary from outside. Case wireframe, zone markers and
+  component colours are deliberately theme-independent.
 
 ## Zones and placement
 

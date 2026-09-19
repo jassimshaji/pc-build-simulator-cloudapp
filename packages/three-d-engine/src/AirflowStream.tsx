@@ -1,16 +1,15 @@
 "use client";
 
-import { useRef } from "react";
+import { useContext, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import type { Mesh, MeshBasicMaterial } from "three";
 import { estimateCfm, fanFlowDirection, streamLoopsPerSecond, streamProgress } from "./airflow";
 import { mm } from "./procedural/units";
+import { SceneThemeContext } from "./SceneThemeContext";
 import type { FanMountFace } from "./zones/generateCaseZones";
 
 const PARTICLE_COUNT = 6;
 const STREAM_LENGTH_MM = 320;
-const INTAKE_COLOR = "#38bdf8";
-const EXHAUST_COLOR = "#fb923c";
 
 // Which axis air travels along at each face, and which way is "out of the
 // case" on that axis (front is -Z, rear +Z, top +Y — matching generateCaseZones).
@@ -31,6 +30,7 @@ export function AirflowStream({
   face: FanMountFace;
   specifications: Record<string, unknown>;
 }) {
+  const sceneTheme = useContext(SceneThemeContext);
   const flow = fanFlowDirection(specifications.bladeDirection, face);
   const cfm =
     typeof specifications.airflowCfm === "number" && specifications.airflowCfm > 0
@@ -75,7 +75,7 @@ export function AirflowStream({
           >
             <sphereGeometry args={[mm(9), 8, 8]} />
             <meshBasicMaterial
-              color={flow === "INTAKE" ? INTAKE_COLOR : EXHAUST_COLOR}
+              color={flow === "INTAKE" ? sceneTheme.flowIntake : sceneTheme.flowExhaust}
               transparent
               opacity={0}
               depthWrite={false}

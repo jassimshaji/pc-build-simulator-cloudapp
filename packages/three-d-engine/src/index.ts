@@ -36,6 +36,8 @@ export type {
   PerformanceTier,
   Bottleneck,
 } from "./estimates";
+export { SCENE_THEMES, DEFAULT_SCENE_THEME, getSceneTheme } from "./sceneTheme";
+export type { SceneTheme, SceneThemeName } from "./sceneTheme";
 export { parseCameraState, cameraFromWorkspaceState } from "./cameraState";
 export type { CameraState, Vec3 } from "./cameraState";
 export { ESSENTIAL_CATEGORIES, summarizeBuild } from "./buildSummary";

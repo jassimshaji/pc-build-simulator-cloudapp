@@ -485,7 +485,11 @@ the constants in `lib/storage.ts` are advisory) and rate limiting on auth/upload
 Acceptable while uploads are admin-only; revisit before a public launch.
 
 **UI kit (§1).** shadcn/ui was planned but never adopted; the UI is plain Tailwind CSS
-components, which has been sufficient.
+components, which has been sufficient. The workspace is composed of hooks
+(`apps/web/hooks/`) and single-purpose panels (`components/workspace/`) over small
+primitives (`components/ui/`) — ADR-016. Light and dark themes work by overriding
+Tailwind's palette variables under `<html data-theme>` (`app/theme.css`), with the 3D scene
+receiving the theme as a prop — ADR-015.
 
 **CI/CD (§8).** GitHub Actions is implemented (`.github/workflows/ci.yml`): Postgres
 service, typecheck, lint, all unit + API-integration tests, and Playwright. The Vercel

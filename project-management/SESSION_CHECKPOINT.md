@@ -5,15 +5,15 @@ to `origin/main` (https://github.com/jassimshaji/pc-build-simulator-cloudapp); C
 
 CURRENT TASK: None in progress — awaiting user instruction.
 
-LAST COMPLETED STEP: Documentation refresh — README, package READMEs, docs/*,
-ARCHITECTURE.md §11, ADR-010..014, roadmap/status/changelog brought up to date.
+LAST COMPLETED STEP: UI modularity + light/dark theme (ADR-015, ADR-016), then docs updated.
+Before that: documentation refresh (README, package READMEs, docs/*, ARCHITECTURE.md §11).
 
 WHAT EXISTS (one-paragraph map)
 - `apps/web`: pages `/`, `/login`, `/register`, `/workspace`, `/builds`, `/shared/[slug]`,
   `/admin/*`; API routes under `app/api/**` (documented in `docs/API.md`); shared logic in
-  `lib/` (`builds.ts`, `compatibility.ts`, `requireRole.ts`, `storage.ts`, ...); side panels
-  in `components/` (`build-summary`, `airflow-panel`, `estimates-panel`); tests in `tests/`
-  (Vitest) and `e2e/` (Playwright).
+  `lib/` (`builds.ts`, `buildDraft.ts`, `compatibility.ts`, `requireRole.ts`, `theme.ts`, ...);
+  state/effects in `hooks/`; UI in `components/` (`ui/` primitives, `workspace/` panels, shared
+  side panels, `scene-canvas`, `theme-toggle`); tests in `tests/` (Vitest) and `e2e/` (Playwright).
 - `packages/three-d-engine`: renderer (`WorkspaceCanvas`, `AirflowStream`) + pure logic
   (`buildSerialization`, `buildSummary`, `cameraState`, `airflow`, `estimates`, zones,
   procedural generators, `resolveComponentAsset`).
@@ -29,13 +29,18 @@ KEY DESIGN POINTS TO KNOW BEFORE CHANGING THINGS
 - `fanMountFace(index)` (front, rear, top) is the single source of truth for fan mount
   faces; both the zone generator and the airflow model use it (ADR-012).
 - Estimates are labelled rule-based heuristics (ADR-013).
+- Theming: light mode is a second set of Tailwind palette variables under
+  `<html data-theme="light">` (`app/theme.css`); components never check the theme, so use the
+  normal zinc/status classes (ADR-015). The 3D scene takes a `theme` prop.
+- The workspace is hooks + single-purpose panels (ADR-016); keep new logic in a hook or a pure
+  `lib/` function rather than growing `build-workspace.tsx`.
 - The seed's SKUs are part of the tests' contract — don't rename/remove them casually.
 - `apps/web` typecheck runs `next typegen` first (fresh checkouts have no route types).
 
 VERIFICATION AT THIS CHECKPOINT
-- `pnpm typecheck`, `pnpm --filter web run lint`, `pnpm test` (307 Vitest tests) and
-  `pnpm --filter web test:e2e` (13 Playwright flows) all pass locally and in GitHub
-  Actions (run on commit `60ed66f`).
+- `pnpm typecheck`, `pnpm --filter web run lint`, `pnpm test` (324 Vitest tests) and
+  `pnpm --filter web test:e2e` (16 Playwright flows) pass locally. GitHub Actions passed on
+  `60ed66f`; the UI/theme commit is pushed after this checkpoint was written — check its run.
 
 KNOWN ISSUES (none blocking): orphaned storage objects on component delete; cosmetic
 Turbopack `export *` warning; slot uniqueness not enforced; zone click targets are small

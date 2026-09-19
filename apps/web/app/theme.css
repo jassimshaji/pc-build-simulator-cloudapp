@@ -1,0 +1,60 @@
+/*
+ * Light theme.
+ *
+ * The UI is written against Tailwind's zinc scale with dark-theme intent
+ * (bg-zinc-950 = page, text-zinc-100 = strongest text, border-zinc-800 = hairline,
+ * text-red-400 = error on dark, ...). Tailwind v4 compiles every one of those
+ * classes to a CSS variable, so the light theme is just a second set of values for
+ * the same variables, applied under <html data-theme="light">: the zinc scale is
+ * flipped end to end (950 <-> 50, 900 <-> 100, 800 <-> 200, ...) and the few
+ * status hues are darkened so they stay readable on a light background.
+ *
+ * No component needs to know which theme is active. Dark is the default and is
+ * Tailwind's own palette, untouched.
+ *
+ * These rules are unlayered on purpose: they must beat Tailwind's `@layer theme`
+ * defaults.
+ */
+:root[data-theme="light"] {
+  color-scheme: light; /* native form controls, scrollbars */
+
+  --background: #fafafa;
+  --foreground: #27272a;
+
+  /* zinc, flipped */
+  --color-zinc-50: #09090b;
+  --color-zinc-100: #18181b;
+  --color-zinc-200: #27272a;
+  --color-zinc-300: #3f3f46;
+  --color-zinc-400: #52525b;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #8b8b95; /* "dim" hint text: darker than a plain flip so it still reads */
+  --color-zinc-700: #c4c4cc; /* input borders: a touch darker than a plain flip so fields stand out */
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-900: #f4f4f5;
+  --color-zinc-950: #fafafa;
+
+  /* status text: the -400 shades are for dark backgrounds */
+  --color-red-400: #dc2626;
+  --color-emerald-400: #047857;
+  --color-emerald-500: #059669;
+  --color-amber-400: #b45309;
+  --color-sky-400: #0284c7;
+  --color-orange-400: #c2410c;
+
+  /* status tints: dark badge/alert backgrounds become pale tints */
+  --color-red-900: #fecaca;
+  --color-red-950: #fee2e2;
+  --color-emerald-950: #d1fae5;
+  --color-amber-950: #fef3c7;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Smooth the switch, but never animate the very first paint. */
+html.theme-ready,
+html.theme-ready body {
+  transition: background-color 150ms ease, color 150ms ease;
+}

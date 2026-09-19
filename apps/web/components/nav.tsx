@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { SignOutButton } from "@/app/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export async function Nav() {
   const session = await getServerSession(authOptions);
@@ -30,6 +31,7 @@ export async function Nav() {
       </div>
 
       <div className="flex items-center gap-4 text-sm">
+        <ThemeToggle />
         {session?.user ? (
           <>
             <span className="hidden text-zinc-400 sm:inline">

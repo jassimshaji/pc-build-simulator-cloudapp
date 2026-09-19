@@ -297,6 +297,10 @@ GLTF asset resolution/loading).
   camera is framed on the case; the layout is pinned to the viewport; hydration warning
   from browser extensions suppressed.
 - **Seed data:** 20 components covering all 12 categories.
+- **UI modularity + light/dark theme (2026-09-19):** the workspace is now hooks +
+  single-purpose panels + `ui/` primitives (ADR-016); a nav toggle switches light/dark, remembered
+  and flash-free, by overriding Tailwind's palette variables (ADR-015), with the 3D scene themed
+  via a prop. 324 Vitest tests + 16 Playwright flows pass.
 - **Cross-cutting (2026-09-19):** 64 API integration tests (real Postgres test database),
   13 Playwright flows, 243 package unit tests (307 Vitest tests + 13 browser = 320 in
   total); docs brought up to date; GitHub Actions CI passing on `main` (ADR-014). The API
