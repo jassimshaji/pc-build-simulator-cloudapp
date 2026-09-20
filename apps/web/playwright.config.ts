@@ -35,6 +35,7 @@ export default defineConfig({
       DATABASE_URL: TEST_DATABASE_URL,
       NEXTAUTH_SECRET: "e2e-only-secret-not-for-production",
       NEXTAUTH_URL: BASE_URL,
+      RATE_LIMIT_DISABLED: "true", // flows register and sign in many users from one address
       S3_ENDPOINT: "http://127.0.0.1:8333",
       S3_ACCESS_KEY_ID: "test",
       S3_SECRET_ACCESS_KEY: "test",

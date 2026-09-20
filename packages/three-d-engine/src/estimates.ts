@@ -77,6 +77,7 @@ export interface ThermalEstimate {
   cpu: ComponentThermal | null;
   gpu: ComponentThermal | null;
   cpuCooler: string; // description of what's cooling the CPU, for display
+  caseAirC: number; // estimated air temperature inside the case under load
 }
 
 const AMBIENT_C = 25;
@@ -86,19 +87,46 @@ const AIO_CAPACITY_WATTS: Record<number, number> = { 120: 150, 240: 250, 280: 28
 const STOCK_COOLER_WATTS = 65;
 const GPU_REFERENCE_WATTS = 350; // a GPU's own cooler is sized for roughly this
 
+// Heat from everything that isn't the CPU or GPU (motherboard VRM, RAM,
+// drives, fans, PSU losses) - a flat allowance, not derived from specs.
+const BASE_HEAT_WATTS = 40;
+// With no case fans a case still exchanges a little air by convection.
+const PASSIVE_CFM = 15;
+// Degrees C of air-temperature rise per watt per CFM of throughput:
+// dT = 1.76 * W / CFM (the standard sensible-heat relation for air).
+const AIR_RISE_C_PER_WATT_PER_CFM = 1.76;
+const MAX_CASE_RISE_C = 25;
+// Temperature rise of a component over the surrounding case air when its
+// cooler is loaded exactly to its rating.
+const CPU_RISE_AT_RATING_C = 55;
+const GPU_RISE_AT_REFERENCE_C = 38;
+
 export function thermalRating(tempC: number): ThermalRating {
   if (tempC < 70) return "Cool";
   if (tempC < 85) return "Warm";
   return "Hot";
 }
 
-// How well the case moves air, as a multiplier on the temperature rise:
-// no fans is worst, intake+exhaust is normal, plenty of airflow is best.
-export function airflowFactor(airflow: Pick<AirflowSummary, "intakeCfm" | "exhaustCfm">): number {
+// How much air actually flows *through* the case (in one side and out the
+// other), which is what carries heat away. A balanced set of fans moves the
+// smaller of intake and exhaust; the imbalance adds a little more through gaps
+// and vents, while a case with only intake or only exhaust leaks and does
+// about half its fan capacity. No fans: convection only.
+export function effectiveThroughflowCfm(airflow: Pick<AirflowSummary, "intakeCfm" | "exhaustCfm">): number {
   const { intakeCfm, exhaustCfm } = airflow;
-  if (intakeCfm === 0 && exhaustCfm === 0) return 1.2;
-  if (intakeCfm === 0 || exhaustCfm === 0) return 1.1;
-  return intakeCfm + exhaustCfm >= 150 ? 0.9 : 1.0;
+  if (intakeCfm === 0 && exhaustCfm === 0) return PASSIVE_CFM;
+  if (intakeCfm === 0 || exhaustCfm === 0) return Math.max(PASSIVE_CFM, 0.5 * Math.max(intakeCfm, exhaustCfm));
+  return Math.min(intakeCfm, exhaustCfm) + 0.25 * Math.abs(intakeCfm - exhaustCfm);
+}
+
+// How much the air inside the case warms up: total heat dumped into it divided
+// by the throughflow, capped so a fanless case doesn't produce absurd numbers.
+export function caseAirRiseC(
+  heatWatts: number,
+  airflow: Pick<AirflowSummary, "intakeCfm" | "exhaustCfm">,
+): number {
+  const rise = (AIR_RISE_C_PER_WATT_PER_CFM * heatWatts) / effectiveThroughflowCfm(airflow);
+  return Math.min(MAX_CASE_RISE_C, rise);
 }
 
 function coolerCapacity(lines: EstimateLine[]): { watts: number; description: string } {
@@ -113,22 +141,32 @@ function coolerCapacity(lines: EstimateLine[]): { watts: number; description: st
   return { watts: STOCK_COOLER_WATTS, description: "stock cooler (none selected)" };
 }
 
-// Load temperature ≈ ambient + (heat / cooling capacity) * 60°C * airflow
-// factor. A CPU whose TDP equals its cooler's rating lands around 85°C in a
-// normal case — "Warm/Hot" territory, which matches how coolers are rated.
+// Load temperature = case air + how far the part's own cooler lets it climb.
+//   case air = 25 C + heat / throughflow            (see caseAirRiseC)
+//   CPU      = case air + (TDP / cooler rating) * 55 C
+//   GPU      = case air + (draw / 350 W) * 38 C
+// A CPU whose TDP equals its cooler's rating in a well-ventilated case lands
+// around 80-85 C, which matches how coolers are rated. Every GPU in the build
+// adds heat to the case; the hottest-running GPU is the one reported.
 export function estimateThermals(lines: EstimateLine[], airflow: AirflowSummary): ThermalEstimate {
-  const factor = airflowFactor(airflow);
   const cooler = coolerCapacity(lines);
 
   const cpuTdp = num(firstOf(lines, "CPU")?.tdpWatts);
-  const cpu = cpuTdp
-    ? toThermal(AMBIENT_C + (cpuTdp / cooler.watts) * 60 * factor)
+  const gpuDraws = lines
+    .filter((line) => line.categoryKey === "GPU")
+    .map((line) => num(line.specifications.powerDrawWatts))
+    .filter((watts): watts is number => watts !== undefined);
+  const hottestGpuWatts = gpuDraws.length > 0 ? Math.max(...gpuDraws) : undefined;
+
+  const heatWatts = BASE_HEAT_WATTS + (cpuTdp ?? 0) + gpuDraws.reduce((sum, watts) => sum + watts, 0);
+  const caseAir = AMBIENT_C + caseAirRiseC(heatWatts, airflow);
+
+  const cpu = cpuTdp ? toThermal(caseAir + (cpuTdp / cooler.watts) * CPU_RISE_AT_RATING_C) : null;
+  const gpu = hottestGpuWatts
+    ? toThermal(caseAir + (hottestGpuWatts / GPU_REFERENCE_WATTS) * GPU_RISE_AT_REFERENCE_C)
     : null;
 
-  const gpuWatts = num(firstOf(lines, "GPU")?.powerDrawWatts);
-  const gpu = gpuWatts ? toThermal(AMBIENT_C + (gpuWatts / GPU_REFERENCE_WATTS) * 55 * factor) : null;
-
-  return { cpu, gpu, cpuCooler: cooler.description };
+  return { cpu, gpu, cpuCooler: cooler.description, caseAirC: Math.round(caseAir) };
 }
 
 function toThermal(rawC: number): ComponentThermal {

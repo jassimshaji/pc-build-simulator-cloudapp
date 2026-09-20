@@ -16,13 +16,14 @@ Cross-cutting work is also done: API integration tests against a real Postgres t
 database, Playwright critical flows, expanded docs, and GitHub Actions CI (passing on
 `main`).
 
-**Tests:** 324 Vitest tests (34 component-models + 74 compatibility-engine + 140
-three-d-engine + 76 web) and 16 Playwright flows.
+**Tests:** 334 Vitest tests (34 component-models + 74 compatibility-engine + 143
+three-d-engine + 86 web) and 17 Playwright flows.
 
 ## What's left (optional, not in the roadmap)
-See `PROJECT_STATUS.md` -> Remaining: a first deployment (Vercel + Neon + R2), slot-limit
-enforcement, real case geometry / real 3D models, pre-launch hardening (rate limiting,
-upload checks), and a better thermal model.
+See `PROJECT_STATUS.md` -> Remaining: a first deployment (Vercel + Neon + R2), real case
+geometry / real 3D models, and the rest of pre-launch hardening (shared rate-limit store,
+magic-byte checks). Slot limits, in-memory rate limiting, enforced upload sizes and a
+heat-balance thermal model were done on 2026-09-20.
 
 Waiting for explicit user instruction before starting anything new. See
 `SESSION_CHECKPOINT.md` for the exact current state.

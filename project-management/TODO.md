@@ -55,6 +55,16 @@ of duplicates — update status in place rather than re-adding a task.
 - [COMPLETED] Simple airflow visualization (animated particles per fan: orange = exhaust, blue = intake; "Show airflow" toggle in workspace, always on in shared view) — live-verified
 - [COMPLETED] Thermal, performance and noise estimation — rule-based heuristics (packages/three-d-engine/src/estimates.ts), shown as an Estimates panel in the workspace + shared view; labelled as rough estimates, performance is a relative 0-100 score not FPS. Live-verified
 
+## Optional / post-MVP
+- [COMPLETED] Slot limits: one case, motherboard, CPU, PSU (client-side)
+- [COMPLETED] Rate limiting on sign-in, registration and upload URLs (in-memory)
+- [COMPLETED] Enforced upload sizes (signed Content-Length)
+- [COMPLETED] Heat-balance thermal model
+- [TODO] Shared rate-limit store (Redis/Upstash) for serverless
+- [TODO] Magic-byte checks on uploaded files
+- [TODO] First deployment (Vercel + Neon + R2) — needs accounts
+- [TODO] Real case geometry and real 3D models
+
 ## Cross-cutting / ongoing
 - [COMPLETED] Testing strategy execution — unit (3 packages: 243 tests), API integration (apps/web/tests: 64 tests, real Postgres test DB, every route incl. auth matrix/ownership/CSV/uploads) and critical-UI Playwright (apps/web/e2e: 13 flows). Found + fixed a real 500 (deleting a component used by a build). See docs/DEVELOPMENT.md
 - [COMPLETED] Expanded docs/API.md (builds, sharing, shared view, status-code conventions; removed stale "planned routes"), docs/DATABASE.md (PCBuild/BuildComponent semantics, workspaceState shape, UNPLACED, shareSlug, 20-component seed, test DB) and docs/DEVELOPMENT.md (testing layers + setup)

@@ -18,10 +18,30 @@ export function lineFromComponent(component: ComponentSummary): BuildLine {
   };
 }
 
+// Categories a build can hold only one of. Everything else (RAM, storage, fans,
+// GPUs, ...) is limited by the number of zones the case and motherboard offer.
+export const SINGLE_SLOT_CATEGORIES: Readonly<Record<string, string>> = {
+  CASE: "case",
+  MOTHERBOARD: "motherboard",
+  CPU: "CPU",
+  PSU: "power supply",
+};
+
+// Why `component` can't be added to `lines`, or null when it can. The message
+// names the part to remove first, since there is no silent "replace".
+export function slotLimitViolation(lines: BuildLine[], component: ComponentSummary): string | null {
+  const noun = SINGLE_SLOT_CATEGORIES[component.category.key];
+  if (!noun) return null;
+  const existing = lines.find((line) => line.categoryKey === component.category.key);
+  if (!existing) return null;
+  return `A build can have only one ${noun}. Remove ${existing.model} before adding another.`;
+}
+
 // Adds one unit: bumps the quantity of an existing line, or appends a new one.
-// Deliberately doesn't enforce "one CPU per build" or similar slot uniqueness
-// — the compatibility rules already tolerate multiples.
+// Single-slot categories (see SINGLE_SLOT_CATEGORIES) are left unchanged when
+// the slot is already taken.
 export function addToLines(lines: BuildLine[], component: ComponentSummary): BuildLine[] {
+  if (slotLimitViolation(lines, component)) return lines;
   const exists = lines.some((line) => line.componentId === component.id);
   return exists
     ? lines.map((line) =>

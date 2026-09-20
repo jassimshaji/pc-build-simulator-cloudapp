@@ -61,6 +61,7 @@ export function AssetForm({
           filename: file.name,
           contentType: file.type || "application/octet-stream",
           purpose: "model",
+          size: file.size,
         }),
       });
       const body = await response.json();

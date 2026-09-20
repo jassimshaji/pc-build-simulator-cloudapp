@@ -139,9 +139,9 @@ pnpm --filter web test:e2e   # Playwright browser tests
 
 | Layer | Where | Count |
 | --- | --- | --- |
-| Unit | `packages/component-models`, `compatibility-engine`, `three-d-engine` | 248 |
-| Web unit + API integration (Vitest, real Postgres) | `apps/web/tests` | 76 |
-| Browser (Playwright) | `apps/web/e2e` | 16 |
+| Unit | `packages/component-models`, `compatibility-engine`, `three-d-engine` | 251 |
+| Web unit + API integration (Vitest, real Postgres) | `apps/web/tests` | 86 |
+| Browser (Playwright) | `apps/web/e2e` | 17 |
 
 The web tests use their own `pcbuilder_test` database (create it once —
 `CREATE DATABASE pcbuilder_test OWNER pcbuilder;`); migrations and seed are applied
@@ -167,9 +167,9 @@ Each package has its own README describing its modules.
 ## Known limitations
 
 - **Not deployed.** The Vercel + Neon + R2 setup is a design; nothing is hosted yet.
-- **No slot limits.** You can add several CPUs or GPUs; the compatibility rules tolerate
-  it but nothing enforces "one CPU per build". Thermal/performance estimates use the
-  first CPU/GPU listed.
+- **Slot limits are client-side and partial.** The workspace allows one case, motherboard,
+  CPU and PSU; other categories (GPUs, ...) are limited only by available zones. The API
+  still accepts a saved build with several CPUs. Performance estimates use the first CPU/GPU.
 - **Approximate layouts.** Zone positions are a schematic floor plan, not real case
   geometry (for example the PSU bay can sit partly outside the case wireframe). Models
   are generic procedural shapes unless a `.glb` is uploaded per component.
@@ -177,10 +177,11 @@ Each package has its own README describing its modules.
   score, not FPS. Only case fans count toward noise/airflow (no GPU/CPU cooler fans, no
   AIO radiator fans).
 - **Orphaned uploads:** deleting a component doesn't delete its files from object storage.
-- **Upload hardening is minimal.** Uploads are admin-only and checked against a
-  content-type allowlist; the size limits are advisory (presigned PUTs can't enforce
-  them) and there is no magic-byte sniffing. There is no rate limiting on sign-in,
-  registration or uploads. Fine for a trusted-admin MVP, worth adding before public launch.
+- **Upload hardening is partial.** Uploads are admin-only, checked against a content-type
+  allowlist and a declared size that is signed into the presigned URL (10 MB images, 50 MB
+  models); there is no magic-byte sniffing. Sign-in, registration and upload requests are
+  rate limited, but in memory per server instance — behind a serverless host that blunts a
+  single client without being a global limit (`lib/rateLimit.ts`; swap in Redis/Upstash). Fine for a trusted-admin MVP, worth adding before public launch.
 - **Cosmetic:** a Turbopack `export *` warning about `@prisma/client` appears in builds.
 
 ## Continuing development

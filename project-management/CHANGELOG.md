@@ -2,6 +2,23 @@
 
 All notable project-level changes, newest first.
 
+## 2026-09-20 — Optional work: slot limits, hardening, thermal model
+- **Slot limits:** a build holds at most one case, motherboard, CPU and PSU. A second is
+  refused with a message naming the part to remove (`slotLimitViolation` in
+  `lib/buildDraft.ts`, notice shown in the workspace). Client-side only; the API still
+  accepts saved builds with several.
+- **Rate limiting** (`lib/rateLimit.ts`, in-memory fixed window): registration 5/hour per IP,
+  sign-in 10/15 min per email, upload URLs 60/hour per user; `429` + `Retry-After`. Disabled by
+  `RATE_LIMIT_DISABLED=true` (set in the Vitest and Playwright configs). Per server instance,
+  so not a global limit on serverless.
+- **Enforced upload sizes:** `POST /api/assets` now requires `size`, returns `413` over the
+  limit and signs `Content-Length` into the presigned PUT. Magic-byte sniffing is still not done.
+- **Thermal model:** replaced the stepped airflow multiplier with a heat balance — case air
+  rises 1.76 x W / CFM of throughflow (`effectiveThroughflowCfm`, `caseAirRiseC`); CPU and GPU
+  sit above that air. All GPUs add heat and the hottest is reported; the panel shows case air.
+- Tests: +10 Vitest (slot limits, rate limiting, upload sizes, thermal), +1 Playwright flow.
+- Not done (needs you): first deployment (cloud accounts) and real 3D models / case geometry.
+
 ## 2026-09-19 — UI modularity and light/dark theme
 - **Theme:** a sun/moon toggle in the nav switches light and dark. Dark stays the default;
   the choice is remembered and applied before first paint (inline `<head>` script). Light

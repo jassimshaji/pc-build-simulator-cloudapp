@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { summarizeAirflow } from "../src/airflow";
 import {
-  airflowFactor,
+  caseAirRiseC,
   cpuIndex,
+  effectiveThroughflowCfm,
   estimateFanDba,
   estimateNoise,
   estimatePerformance,
@@ -59,11 +60,22 @@ describe("thermals", () => {
     FAN_MOUNT_2: fan({ airflowCfm: 90 }),
   });
 
-  it("scales the factor with case airflow", () => {
-    expect(airflowFactor(noFans)).toBe(1.2);
-    expect(airflowFactor(summarizeAirflow({ FAN_MOUNT_2: fan({ airflowCfm: 50 }) }))).toBe(1.1);
-    expect(airflowFactor(summarizeAirflow({ FAN_MOUNT_1: fan({ airflowCfm: 50 }), FAN_MOUNT_2: fan({ airflowCfm: 50 }) }))).toBe(1.0);
-    expect(airflowFactor(goodFlow)).toBe(0.9);
+  it("measures throughflow: balanced fans move the smaller side, one-sided cases leak, no fans is convection", () => {
+    expect(effectiveThroughflowCfm(noFans)).toBe(15);
+    expect(effectiveThroughflowCfm(summarizeAirflow({ FAN_MOUNT_2: fan({ airflowCfm: 50 }) }))).toBe(25);
+    expect(effectiveThroughflowCfm({ intakeCfm: 90, exhaustCfm: 90 })).toBe(90);
+    expect(effectiveThroughflowCfm({ intakeCfm: 120, exhaustCfm: 80 })).toBe(90);
+  });
+
+  it("warms the case air with heat and cools it with airflow, up to a cap", () => {
+    expect(caseAirRiseC(300, { intakeCfm: 90, exhaustCfm: 90 })).toBeCloseTo((1.76 * 300) / 90, 5);
+    expect(caseAirRiseC(600, { intakeCfm: 90, exhaustCfm: 90 })).toBeGreaterThan(
+      caseAirRiseC(300, { intakeCfm: 90, exhaustCfm: 90 }),
+    );
+    expect(caseAirRiseC(300, { intakeCfm: 200, exhaustCfm: 200 })).toBeLessThan(
+      caseAirRiseC(300, { intakeCfm: 90, exhaustCfm: 90 }),
+    );
+    expect(caseAirRiseC(5000, noFans)).toBe(25);
   });
 
   it("returns null components when the CPU/GPU is missing", () => {
@@ -91,6 +103,19 @@ describe("thermals", () => {
     const cool = estimateThermals([cpu7800x3d, tower, gpu4090], goodFlow);
     expect(hot.gpu!.tempC).toBeGreaterThan(cool.gpu!.tempC);
     expect(hot.cpu!.tempC).toBeGreaterThan(cool.cpu!.tempC);
+  });
+
+  it("reports the case air temperature, and a second GPU heats the case and the CPU", () => {
+    const one = estimateThermals([cpu7800x3d, gpu4070], goodFlow);
+    const two = estimateThermals([cpu7800x3d, gpu4070, gpu4070], goodFlow);
+    expect(one.caseAirC).toBeGreaterThan(25);
+    expect(two.caseAirC).toBeGreaterThan(one.caseAirC);
+    expect(two.cpu!.tempC).toBeGreaterThanOrEqual(one.cpu!.tempC);
+  });
+
+  it("reports the hottest GPU, not just the first listed", () => {
+    const result = estimateThermals([gpu4070, gpu4090], goodFlow);
+    expect(result.gpu!.tempC).toBeGreaterThan(estimateThermals([gpu4070], goodFlow).gpu!.tempC);
   });
 
   it("clamps temperatures and rates them", () => {

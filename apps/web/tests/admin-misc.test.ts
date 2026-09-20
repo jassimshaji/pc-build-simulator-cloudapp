@@ -6,6 +6,7 @@ import { POST as createCategory } from "@/app/api/components/categories/route";
 import { DELETE as deleteCategory, PATCH as patchCategory } from "@/app/api/components/categories/[id]/route";
 import { PUT as putAsset } from "@/app/api/components/[id]/asset/route";
 import { POST as requestUpload } from "@/app/api/assets/route";
+import { MAX_MODEL_UPLOAD_BYTES, MAX_UPLOAD_BYTES } from "@/lib/storage";
 import {
   TEST_PREFIX,
   cleanupTestData,
@@ -106,7 +107,7 @@ describe("3D asset assignment", () => {
 
 describe("POST /api/assets (presigned uploads)", () => {
   it("requires an admin/inventory role", async () => {
-    const body = { filename: "a.png", contentType: "image/png" };
+    const body = { filename: "a.png", contentType: "image/png", size: 1024 };
     expect((await requestUpload(jsonRequest("POST", body))).status).toBe(401);
     loginAs(regularUser);
     expect((await requestUpload(jsonRequest("POST", body))).status).toBe(403);
@@ -115,12 +116,14 @@ describe("POST /api/assets (presigned uploads)", () => {
   it("returns a presigned PUT url, a public url and a sanitized key", async () => {
     loginAs(admin);
     const response = await requestUpload(
-      jsonRequest("POST", { filename: "../my photo?.png", contentType: "image/png" }),
+      jsonRequest("POST", { filename: "../my photo?.png", contentType: "image/png", size: 2048 }),
     );
     const { data } = await readJson(response);
 
     expect(response.status).toBe(200);
     expect(data.uploadUrl).toContain("X-Amz-Signature=");
+    // The declared size is enforced by storage because content-length is signed.
+    expect(new URL(data.uploadUrl).searchParams.get("X-Amz-SignedHeaders")).toContain("content-length");
     expect(data.key).toMatch(/^components\/[0-9a-f-]{36}-/);
     // Nothing in the filename can add path segments or query characters: after
     // the "components/" prefix there is no slash, backslash, "?" or space.
@@ -131,17 +134,54 @@ describe("POST /api/assets (presigned uploads)", () => {
   it("uses a models/ prefix for model uploads and checks content types per purpose", async () => {
     loginAs(admin);
     const model = await requestUpload(
-      jsonRequest("POST", { filename: "case.glb", contentType: "model/gltf-binary", purpose: "model" }),
+      jsonRequest("POST", { filename: "case.glb", contentType: "model/gltf-binary", purpose: "model", size: 4096 }),
     );
     expect((await readJson(model)).data.key).toMatch(/^models\//);
 
-    const wrongForImage = await requestUpload(jsonRequest("POST", { filename: "a.glb", contentType: "model/gltf-binary" }));
+    const wrongForImage = await requestUpload(
+      jsonRequest("POST", { filename: "a.glb", contentType: "model/gltf-binary", size: 4096 }),
+    );
     expect(wrongForImage.status).toBe(400);
     const wrongForModel = await requestUpload(
-      jsonRequest("POST", { filename: "a.png", contentType: "image/png", purpose: "model" }),
+      jsonRequest("POST", { filename: "a.png", contentType: "image/png", purpose: "model", size: 4096 }),
     );
     expect(wrongForModel.status).toBe(400);
     expect((await requestUpload(jsonRequest("POST", { filename: "a.png" }))).status).toBe(400);
+  });
+
+  it("requires a size and rejects files over the per-purpose limit with 413", async () => {
+    loginAs(admin);
+    const noSize = await requestUpload(jsonRequest("POST", { filename: "a.png", contentType: "image/png" }));
+    expect(noSize.status).toBe(400);
+
+    const bigImage = await requestUpload(
+      jsonRequest("POST", { filename: "a.png", contentType: "image/png", size: MAX_UPLOAD_BYTES + 1 }),
+    );
+    expect(bigImage.status).toBe(413);
+    const okImage = await requestUpload(
+      jsonRequest("POST", { filename: "a.png", contentType: "image/png", size: MAX_UPLOAD_BYTES }),
+    );
+    expect(okImage.status).toBe(200);
+
+    // Models get the larger allowance.
+    const bigModel = await requestUpload(
+      jsonRequest("POST", {
+        filename: "a.glb",
+        contentType: "model/gltf-binary",
+        purpose: "model",
+        size: MAX_UPLOAD_BYTES + 1,
+      }),
+    );
+    expect(bigModel.status).toBe(200);
+    const hugeModel = await requestUpload(
+      jsonRequest("POST", {
+        filename: "a.glb",
+        contentType: "model/gltf-binary",
+        purpose: "model",
+        size: MAX_MODEL_UPLOAD_BYTES + 1,
+      }),
+    );
+    expect(hugeModel.status).toBe(413);
   });
 });
 

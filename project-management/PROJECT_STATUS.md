@@ -313,17 +313,16 @@ GLTF asset resolution/loading).
 
 ## Remaining (optional — none is in the roadmap)
 - Deploy: Vercel + Neon + R2 are a design only (`docs/DEPLOYMENT.md` lists the steps).
-- Slot limits (one CPU, etc.) are not enforced.
 - Real case geometry for zone positions (today a schematic floor plan; e.g. the PSU bay can
   sit partly outside the case wireframe), and real 3D models via the asset manager.
-- Hardening before a public launch: rate limiting on auth/uploads, magic-byte checks and
-  enforced upload sizes (see ARCHITECTURE.md §11), deleting a component's storage objects.
-- Better estimates (a real thermal model) and a pointer-drag placement mode (ADR-003).
+- Hardening before a public launch: a shared (Redis) rate-limit store, magic-byte checks
+  (see ARCHITECTURE.md §11), deleting a component's storage objects.
+- A pointer-drag placement mode (ADR-003), server-side slot limits, a slot limit for GPUs.
 
 ## Known issues
 - None blocking. Non-blocking: orphaned storage objects on component delete; a cosmetic
   Turbopack `export *` warning about `@prisma/client` in builds; the 3D zone click targets
-  are small at high zoom-out; estimates use only the first CPU/GPU in a build.
+  are small at high zoom-out; performance estimates use only the first CPU/GPU in a build.
 
 ## Blockers
 - None.

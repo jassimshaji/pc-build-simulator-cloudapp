@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@pcbuilder/database";
 import { apiError, apiSuccess } from "@pcbuilder/shared";
+import { clientIp, rateLimit } from "@/lib/rateLimit";
 
 const registerSchema = z.object({
   email: z.email(),
@@ -11,6 +12,14 @@ const registerSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const limit = rateLimit("register", clientIp(request));
+  if (!limit.allowed) {
+    return NextResponse.json(apiError("Too many sign-up attempts. Try again later."), {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+    });
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = registerSchema.safeParse(body);
 

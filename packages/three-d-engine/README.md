@@ -81,9 +81,13 @@ components without pulling the 3D bundle into the main chunk.
 - `src/estimates.ts` — rule-based **estimates, not simulations**:
   - `estimateNoise` — case-fan levels added logarithmically (two equal fans ≈ +3 dB);
     size-based fallback when a fan has no dBA figure.
-  - `estimateThermals` — load temperature ≈ 25 °C + heat ÷ cooling capacity × 60 °C ×
-    an airflow factor. Capacity comes from the air cooler's rating or the AIO radiator
-    size (a 65 W stock cooler when none is selected); clamped to 30-105 °C.
+  - `estimateThermals` — a heat-balance model. The air inside the case warms by
+    1.76 x watts / CFM of throughflow (all CPU + GPU heat plus a 40 W allowance; a
+    balanced fan set moves the smaller of intake/exhaust, a one-sided case about half,
+    no fans is 15 CFM of convection; rise capped at 25 C). The CPU then sits
+    (TDP / cooler rating) x 55 C above that air and the hottest GPU (draw / 350 W) x
+    38 C. Cooler capacity comes from the air cooler's rating or the AIO radiator size (a
+    65 W stock cooler when none is selected); clamped to 30-105 C.
   - `estimatePerformance` — a relative 0-100 score (65% GPU, 35% CPU; games favor clock
     speed and cache over cores past 8) with a tier and CPU/GPU-bottleneck flag. Needs
     both a CPU and a GPU. Not an FPS figure.

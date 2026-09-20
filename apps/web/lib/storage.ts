@@ -46,11 +46,9 @@ export const ALLOWED_MODEL_CONTENT_TYPES = [
   "application/octet-stream",
 ] as const;
 
-// Advisory only: presigned PUT URLs can't enforce a byte-size limit the way
-// a presigned POST policy could. Acceptable for now since uploads are
-// ADMIN/INVENTORY_MANAGER-only (a trusted-user boundary), not public — see
-// ARCHITECTURE.md §9. Revisit with presigned POST conditions if this ever
-// needs to hold up against untrusted uploaders.
+// Enforced: the client declares the file size when asking for an upload URL
+// (checked against these limits) and that exact Content-Length is signed into
+// the presigned PUT, so storage rejects a body of any other size.
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 export const MAX_MODEL_UPLOAD_BYTES = 50 * 1024 * 1024; // 50MB — GLTF/GLB run larger than images
 
@@ -62,9 +60,14 @@ export function buildAssetKey(filename: string, prefix: "components" | "models" 
   return `${prefix}/${randomUUID()}-${sanitizeFilename(filename)}`;
 }
 
-export async function createUploadUrl(key: string, contentType: string): Promise<string> {
-  const command = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType });
-  return getSignedUrl(s3Client, command, { expiresIn: 300 });
+export async function createUploadUrl(key: string, contentType: string, sizeBytes: number): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: contentType,
+    ContentLength: sizeBytes,
+  });
+  return getSignedUrl(s3Client, command, { expiresIn: 300, signableHeaders: new Set(["content-length"]) });
 }
 
 export function getPublicAssetUrl(key: string): string {

@@ -7,6 +7,9 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Many tests sign up / sign in from the same "address"; rate-limit tests
+    // switch this back on for themselves.
+    env: { RATE_LIMIT_DISABLED: "true" },
     include: ["tests/**/*.test.ts"],
     globalSetup: ["tests/globalSetup.ts"],
     setupFiles: ["tests/setup.ts"],

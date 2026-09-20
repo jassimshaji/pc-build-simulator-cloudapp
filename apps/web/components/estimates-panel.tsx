@@ -51,6 +51,7 @@ export function EstimatesPanel({
   return (
     <div className="mt-2 space-y-2 text-xs">
       <dl className="space-y-1.5">
+        <Row label="Case air (load)">~{thermals.caseAirC}°C</Row>
         <Row label="CPU temp (load)">
           {thermals.cpu ? (
             <span className={RATING_CLASS[thermals.cpu.rating]}>

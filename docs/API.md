@@ -22,7 +22,9 @@ signed in with the wrong role, `400` invalid input, `404` not found, `409` confl
 Public. Body: `{ email: string, password: string (min 8 chars), name?: string }`.
 Validates with Zod, hashes the password with `bcryptjs`, creates a `User` with role
 `USER`. Returns `409` if the email is already registered, `400` on invalid input,
-`201` with `{ data: { id, email }, error: null }` on success. Does not sign the user
+`201` with `{ data: { id, email }, error: null }` on success. Limited to 5 requests per hour per
+client IP (`429` with `Retry-After`); sign-in is limited to 10 attempts per 15 minutes per email
+(a blocked attempt fails like a wrong password). Does not sign the user
 in — the client calls `signIn("credentials", ...)` afterward (see `app/register/page.tsx`).
 
 ### `/api/auth/[...nextauth]` (GET/POST)
@@ -168,8 +170,11 @@ URL first via `POST /api/assets` with `purpose: "model"` (see below), PUT the fi
 there, then pass the returned `publicUrl` here.
 
 ### `POST /api/assets`
-`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ filename, contentType, purpose?: "image"
-| "model" }` (`purpose` defaults to `"image"`). `contentType` is checked against an
+`ADMIN`/`INVENTORY_MANAGER` only. Body: `{ filename, contentType, size, purpose?: "image"
+| "model" }` (`purpose` defaults to `"image"`; `size` is the file's byte length). `size` is
+checked against the limit for the purpose (10 MB images, 50 MB models) — `413` when over — and
+signed into the upload URL as `Content-Length`, so the PUT must send exactly that many bytes.
+Limited to 60 requests per hour per user (`429` with `Retry-After`). `contentType` is checked against an
 allowlist for the given `purpose` — images: `image/png`, `image/jpeg`,
 `image/webp`, `image/gif`; models: `model/gltf-binary`, `model/gltf+json`,
 `application/octet-stream` (browsers almost never report a real MIME type for

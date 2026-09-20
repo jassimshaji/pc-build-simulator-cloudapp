@@ -7,6 +7,7 @@ import {
   placementFromComponent,
   removeFromLines,
   removePlacementsOf,
+  slotLimitViolation,
 } from "@/lib/buildDraft";
 import type { BuildLine, ComponentSummary, InitialBuild } from "@/types/workspace";
 
@@ -17,18 +18,30 @@ export function useBuildDraft(initial?: Pick<InitialBuild, "buildLines" | "place
   const [buildLines, setBuildLines] = useState<BuildLine[]>(initial?.buildLines ?? []);
   const [placements, setPlacements] = useState<Record<string, PlacedComponent>>(initial?.placements ?? {});
 
-  // Adds one unit, and — when a zone is given — places it there too.
-  const addComponent = useCallback((component: ComponentSummary, zoneKey?: string | null) => {
-    setBuildLines((lines) => addToLines(lines, component));
-    if (zoneKey) {
-      setPlacements((current) => ({ ...current, [zoneKey]: placementFromComponent(component) }));
-    }
-  }, []);
+  // Set when an add is refused (e.g. a second CPU); cleared by the next
+  // successful add or removal.
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Adds one unit, and — when a zone is given — places it there too. A
+  // single-slot category that's already filled is refused with a notice.
+  const addComponent = useCallback(
+    (component: ComponentSummary, zoneKey?: string | null) => {
+      const violation = slotLimitViolation(buildLines, component);
+      setNotice(violation);
+      if (violation) return;
+      setBuildLines((lines) => addToLines(lines, component));
+      if (zoneKey) {
+        setPlacements((current) => ({ ...current, [zoneKey]: placementFromComponent(component) }));
+      }
+    },
+    [buildLines],
+  );
 
   const removeComponent = useCallback((componentId: string) => {
+    setNotice(null);
     setBuildLines((lines) => removeFromLines(lines, componentId));
     setPlacements((current) => removePlacementsOf(current, componentId));
   }, []);
 
-  return { buildLines, placements, addComponent, removeComponent };
+  return { buildLines, placements, notice, addComponent, removeComponent };
 }

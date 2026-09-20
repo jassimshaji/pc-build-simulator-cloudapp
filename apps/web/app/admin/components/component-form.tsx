@@ -167,7 +167,7 @@ export function ComponentForm({
       const response = await fetch("/api/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+        body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
       });
       const body = await response.json();
       if (!response.ok) {

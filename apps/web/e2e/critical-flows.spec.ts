@@ -134,6 +134,19 @@ test.describe("the build workspace", () => {
     await expect(page.getByText(/socket/i).first()).toBeVisible();
   });
 
+  test("a second CPU is refused with a message until the first is removed", async ({ page }) => {
+    await page.goto("/workspace");
+    await addToBuild(page, "CPU", "7800X3D");
+
+    // Not addToBuild(): that helper waits for the part to appear in the build.
+    await page.getByText("13600K").first().click();
+    await page.getByRole("button", { name: "Add to build" }).click();
+
+    await expect(page.getByText("A build can have only one CPU")).toBeVisible();
+    await expect(page.getByRole("list").filter({ hasText: "13600K" })).toHaveCount(0);
+    await expect(page.getByRole("list").filter({ hasText: "7800X3D" }).first()).toBeVisible();
+  });
+
   test("a guest is told to log in when saving", async ({ page }) => {
     await page.goto("/workspace");
     await addToBuild(page, "PC Case", "H510");

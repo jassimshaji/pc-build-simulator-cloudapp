@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@pcbuilder/database";
+import { rateLimit } from "@/lib/rateLimit";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
@@ -17,6 +18,14 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          return null;
+        }
+
+        // Keyed by email so password guessing against one account is capped
+        // however many addresses it comes from. A blocked attempt looks like a
+        // wrong password (null), so the limiter reveals nothing about accounts.
+        const limit = rateLimit("login", credentials.email.toLowerCase());
+        if (!limit.allowed) {
           return null;
         }
 

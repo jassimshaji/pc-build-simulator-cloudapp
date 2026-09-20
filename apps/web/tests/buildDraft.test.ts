@@ -6,6 +6,7 @@ import {
   placementFromComponent,
   removeFromLines,
   removePlacementsOf,
+  slotLimitViolation,
 } from "@/lib/buildDraft";
 import type { ComponentSummary } from "@/types/workspace";
 
@@ -41,6 +42,19 @@ describe("buildDraft", () => {
       ["cpu", 1],
       ["ram", 2],
     ]);
+  });
+
+  it("allows only one case, motherboard, CPU and PSU, naming the part to remove", () => {
+    for (const key of ["CASE", "MOTHERBOARD", "CPU", "PSU"]) {
+      const lines = addToLines([], component("first", key));
+      expect(slotLimitViolation(lines, component("second", key))).toContain("Model first");
+      expect(addToLines(lines, component("second", key))).toBe(lines);
+      expect(addToLines(lines, component("first", key))).toBe(lines);
+    }
+    // Other categories are unrestricted.
+    const gpus = addToLines(addToLines([], component("g1", "GPU")), component("g2", "GPU"));
+    expect(gpus).toHaveLength(2);
+    expect(slotLimitViolation(gpus, component("g3", "GPU"))).toBeNull();
   });
 
   it("does not mutate the lines it is given", () => {

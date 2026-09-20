@@ -22,8 +22,8 @@ import type { Category, ComponentSummary, InitialBuild } from "@/types/workspace
 //
 // Placement: "Add to build" drops a part into the first free compatible zone
 // (needs a case, and a motherboard for RAM/GPU/etc.); alternatively select a
-// part and click a highlighted zone in the 3D view to choose the slot. Slot
-// uniqueness (one CPU, ...) is deliberately not enforced.
+// part and click a highlighted zone in the 3D view to choose the slot. A build
+// holds at most one case, motherboard, CPU and PSU (lib/buildDraft.ts).
 export function BuildWorkspace({
   categories,
   initialBuild,
@@ -115,6 +115,11 @@ export function BuildWorkspace({
               initialCamera={initialBuild?.camera}
             />
           </div>
+          {draft.notice && (
+            <p role="alert" className="rounded border border-amber-700 bg-amber-950/40 px-3 py-1.5 text-xs text-amber-300">
+              {draft.notice}
+            </p>
+          )}
           <ViewportControls
             showAirflow={showAirflow}
             onShowAirflowChange={setShowAirflow}
